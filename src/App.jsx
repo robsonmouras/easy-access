@@ -9,7 +9,6 @@ import ForgotPassword from './pages/ForgotPassword'
 import SetPassword from './pages/SetPassword'
 import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
-import InviteUser from './pages/InviteUser'
 import UserApproval from './pages/UserApproval'
 import Users from './pages/Users'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -42,11 +41,7 @@ function App() {
             />
             <Route
               path="/invite-user"
-              element={
-                <ProtectedRoute>
-                  <InviteUser />
-                </ProtectedRoute>
-              }
+              element={<Navigate to="/users" replace />}
             />
             <Route
               path="/user-approval"

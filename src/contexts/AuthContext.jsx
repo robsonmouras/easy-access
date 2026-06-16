@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext({})
@@ -19,14 +19,21 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const forceSignOut = async () => {
+  // Ref para que os callbacks de Realtime sempre leiam o perfil atual
+  // sem ficarem presos em closures desatualizadas
+  const userProfileRef = useRef(null)
+  useEffect(() => {
+    userProfileRef.current = userProfile
+  }, [userProfile])
+
+  const forceSignOut = useCallback(async () => {
     localStorage.removeItem(SESSION_KEY)
     await supabase.auth.signOut()
     setUserProfile(null)
-  }
+  }, [])
 
+  // ─── Auth state + expiração de sessão ───────────────────────────────────────
   useEffect(() => {
-    // Verifica expiração de sessão ao montar e a cada 5 minutos
     const checkExpiry = () => {
       const loginAt = localStorage.getItem(SESSION_KEY)
       if (loginAt && Date.now() - parseInt(loginAt) > SESSION_MAX_MS) {
@@ -62,7 +69,70 @@ export const AuthProvider = ({ children }) => {
       clearInterval(interval)
       subscription.unsubscribe()
     }
-  }, [])
+  }, [forceSignOut])
+
+  // ─── Realtime: logout imediato quando acesso é alterado ─────────────────────
+  useEffect(() => {
+    if (!user?.id) return
+    const userId = user.id
+
+    // Monitora mudanças no perfil do usuário logado.
+    // Se status, custom_access_enabled ou role mudarem → desloga.
+    // Se outro campo mudar (ex: full_name) → apenas atualiza o perfil em memória.
+    const profileChannel = supabase
+      .channel(`profile-watch-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_profiles',
+          filter: `id=eq.${userId}`,
+        },
+        (payload) => {
+          const updated = payload.new
+          const current = userProfileRef.current
+
+          const accessChanged =
+            updated.status !== 'active' ||
+            updated.custom_access_enabled !== current?.custom_access_enabled ||
+            updated.role !== current?.role
+
+          if (accessChanged) {
+            forceSignOut()
+          } else {
+            setUserProfile(updated)
+            userProfileRef.current = updated
+          }
+        }
+      )
+      .subscribe()
+
+    // Monitora remoção de empresas liberadas para o usuário logado.
+    // Requer REPLICA IDENTITY FULL na tabela user_company_access (migration 002).
+    const accessChannel = supabase
+      .channel(`access-watch-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'user_company_access',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          forceSignOut()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(profileChannel)
+      supabase.removeChannel(accessChannel)
+    }
+  }, [user?.id, forceSignOut])
+
+  // ────────────────────────────────────────────────────────────────────────────
 
   const fetchUserProfile = async (userId) => {
     try {

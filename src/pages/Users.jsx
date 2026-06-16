@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useCompany } from '../contexts/CompanyContext'
 import { supabase } from '../lib/supabase'
 import Header from '../components/Header'
 import Modal from '../components/Modal'
 import {
   Users as UsersIcon, Clock, UserPlus, CheckCircle, XCircle,
-  User, Shield, AlertCircle, Save, X,
+  User, Shield, AlertCircle, Save, X, Lock, Settings2,
+  ChevronDown, ChevronRight, Building2, Key,
 } from 'lucide-react'
 import Swal from 'sweetalert2'
 
@@ -23,6 +25,7 @@ const STATUS_CONFIG = {
 
 export default function Users() {
   const { userProfile, updateUserRole } = useAuth()
+  const { companies } = useCompany()
   const isSuperAdmin = userProfile?.role === 'super_admin'
   const isAdmin      = userProfile?.role === 'admin'
   const canAccess    = isSuperAdmin || isAdmin
@@ -34,16 +37,30 @@ export default function Users() {
   const [processing, setProcessing] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Role editing
+  // Role editing (inline na tabela)
   const [editingUser, setEditingUser] = useState(null)
   const [newRole, setNewRole]         = useState('')
 
-  // Invite modal
-  const [showInvite, setShowInvite]     = useState(false)
-  const [inviteForm, setInviteForm]     = useState({ email: '', fullName: '', role: 'básico' })
-  const [inviteLoading, setInviteLoading] = useState(false)
-  const [inviteError, setInviteError]   = useState('')
-  const [inviteSuccess, setInviteSuccess] = useState('')
+  // ─── Invite modal ────────────────────────────────────────────────────────────
+  const [showInvite, setShowInvite]         = useState(false)
+  const [inviteForm, setInviteForm]         = useState({ email: '', fullName: '', role: 'básico' })
+  const [inviteLoading, setInviteLoading]   = useState(false)
+  const [inviteError, setInviteError]       = useState('')
+  const [inviteSuccess, setInviteSuccess]   = useState('')
+  // Custom access no convite
+  const [inviteCustomAccess, setInviteCustomAccess]           = useState(false)
+  const [inviteSelectedCompanies, setInviteSelectedCompanies] = useState(new Set())
+  const [inviteExceptedCreds, setInviteExceptedCreds]         = useState(new Set())
+  const [inviteCredsByCompany, setInviteCredsByCompany]       = useState({})
+
+  // ─── Edit access modal ───────────────────────────────────────────────────────
+  const [editAccessUser, setEditAccessUser]           = useState(null)
+  const [editCustomAccess, setEditCustomAccess]       = useState(false)
+  const [editSelectedCompanies, setEditSelectedCompanies] = useState(new Set())
+  const [editExceptedCreds, setEditExceptedCreds]     = useState(new Set())
+  const [editCredsByCompany, setEditCredsByCompany]   = useState({})
+  const [editAccessLoading, setEditAccessLoading]     = useState(false)
+  const [editAccessSaving, setEditAccessSaving]       = useState(false)
 
   useEffect(() => {
     if (canAccess) fetchData()
@@ -79,6 +96,25 @@ export default function Users() {
     }
   }
 
+  // ─── Helpers de credenciais on-demand ────────────────────────────────────────
+  const loadCredentialsForCompany = async (companyId, credsByCompany, setCredsByCompany) => {
+    if (credsByCompany[companyId] !== undefined) return
+    const { data } = await supabase
+      .from('credentials')
+      .select('id, name, type')
+      .eq('company_id', companyId)
+      .order('name')
+    setCredsByCompany(prev => ({ ...prev, [companyId]: data || [] }))
+  }
+
+  // ─── Regra de permissão: quem pode editar o escopo de quem ──────────────────
+  const canManageAccess = (targetUser) => {
+    if (isSuperAdmin) return true
+    if (isAdmin && targetUser.role === 'básico' && targetUser.invited_by_id === userProfile?.id) return true
+    return false
+  }
+
+  // ─── Aprovação / rejeição ────────────────────────────────────────────────────
   const handleApprove = async (user) => {
     setProcessing(user.id)
     try {
@@ -125,6 +161,7 @@ export default function Users() {
     }
   }
 
+  // ─── Edição de papel (inline) ────────────────────────────────────────────────
   const handleSaveRole = async () => {
     if (!editingUser || !newRole) return
     try {
@@ -135,6 +172,15 @@ export default function Users() {
     } catch {
       Swal.fire({ title: 'Erro', text: 'Não foi possível atualizar o perfil do usuário.', icon: 'error' })
     }
+  }
+
+  // ─── Convite ─────────────────────────────────────────────────────────────────
+  const resetInviteState = () => {
+    setInviteForm({ email: '', fullName: '', role: 'básico' })
+    setInviteCustomAccess(false)
+    setInviteSelectedCompanies(new Set())
+    setInviteExceptedCreds(new Set())
+    setInviteCredsByCompany({})
   }
 
   const handleInvite = async (e) => {
@@ -175,44 +221,48 @@ export default function Users() {
       }
       if (!authData.user) throw new Error('Erro ao criar usuário')
 
-      const profileBase = {
-        id: authData.user.id,
-        email: inviteForm.email,
-        full_name: inviteForm.fullName,
-        role: inviteForm.role,
-        status: 'pending',
-      }
-
-      // Try saving with invited_by_name; if the column doesn't exist yet fall back without it.
-      // To enable this feature, add a nullable text column "invited_by_name" to user_profiles.
-      let { error: profileError } = await supabase
+      const { error: profileError } = await supabase
         .from('user_profiles')
-        .insert([{ ...profileBase, invited_by_name: userProfile?.full_name || null }])
+        .insert([{
+          id: authData.user.id,
+          email: inviteForm.email,
+          full_name: inviteForm.fullName,
+          role: inviteForm.role,
+          status: 'pending',
+          invited_by_id: userProfile?.id || null,
+          invited_by_name: userProfile?.full_name || null,
+          custom_access_enabled: inviteCustomAccess,
+        }])
+      if (profileError) throw profileError
 
-      // PostgREST returns PGRST204 when the column is not in the schema cache;
-      // PostgreSQL direct would be 42703. Also match on message as a safety net.
-      const isColumnMissing =
-        profileError?.code === 'PGRST204' ||
-        profileError?.code === '42703' ||
-        profileError?.message?.includes('invited_by_name')
+      // Salva acesso personalizado se habilitado
+      if (inviteCustomAccess && inviteSelectedCompanies.size > 0) {
+        const companyRows = Array.from(inviteSelectedCompanies).map(companyId => ({
+          user_id: authData.user.id,
+          company_id: companyId,
+          granted_by: userProfile?.id || null,
+        }))
+        const { error: accessErr } = await supabase.from('user_company_access').insert(companyRows)
+        if (accessErr) throw accessErr
 
-      if (isColumnMissing) {
-        const { error: retryError } = await supabase.from('user_profiles').insert([profileBase])
-        if (retryError) throw retryError
-      } else if (profileError) {
-        throw profileError
+        if (inviteExceptedCreds.size > 0) {
+          const exceptRows = Array.from(inviteExceptedCreds).map(credId => ({
+            user_id: authData.user.id,
+            credential_id: credId,
+            created_by: userProfile?.id || null,
+          }))
+          const { error: exceptErr } = await supabase.from('user_credential_exceptions').insert(exceptRows)
+          if (exceptErr) throw exceptErr
+        }
       }
 
       setInviteSuccess(`${inviteForm.email} convidado com sucesso! Aguardando aprovação de um Super Admin.`)
-      setInviteForm({ email: '', fullName: '', role: 'básico' })
+      resetInviteState()
       await fetchData()
     } catch (err) {
       const msg = err.message || ''
       if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('email rate')) {
-        setInviteError(
-          'Erro ao convidar usuario! ' +
-          'Tente novamente mais tarde. Se o problema persistir, entre em contato com o suporte.'
-        )
+        setInviteError('Limite de envios atingido. Tente novamente mais tarde.')
       } else {
         setInviteError(msg || 'Erro ao criar usuário')
       }
@@ -221,9 +271,111 @@ export default function Users() {
     }
   }
 
+  // ─── Edição de acesso personalizado ─────────────────────────────────────────
+  const openEditAccess = async (targetUser) => {
+    setEditAccessUser(targetUser)
+    setEditCustomAccess(targetUser.custom_access_enabled || false)
+    setEditSelectedCompanies(new Set())
+    setEditExceptedCreds(new Set())
+    setEditCredsByCompany({})
+    setEditAccessLoading(true)
+
+    try {
+      const [{ data: companyAccess, error: err1 }, { data: credExceptions, error: err2 }] =
+        await Promise.all([
+          supabase.from('user_company_access').select('company_id').eq('user_id', targetUser.id),
+          supabase.from('user_credential_exceptions').select('credential_id').eq('user_id', targetUser.id),
+        ])
+      if (err1) throw err1
+      if (err2) throw err2
+
+      const selectedIds = new Set(companyAccess?.map(r => r.company_id) || [])
+      const exceptedIds = new Set(credExceptions?.map(r => r.credential_id) || [])
+      setEditSelectedCompanies(selectedIds)
+      setEditExceptedCreds(exceptedIds)
+
+      // Pré-carrega credenciais das empresas já liberadas
+      if (selectedIds.size > 0) {
+        const results = await Promise.all(
+          Array.from(selectedIds).map(companyId =>
+            supabase
+              .from('credentials')
+              .select('id, name, type')
+              .eq('company_id', companyId)
+              .order('name')
+              .then(({ data }) => [companyId, data || []])
+          )
+        )
+        setEditCredsByCompany(Object.fromEntries(results))
+      }
+    } catch (err) {
+      Swal.fire({ title: 'Erro', text: 'Não foi possível carregar as configurações de acesso.', icon: 'error' })
+      setEditAccessUser(null)
+    } finally {
+      setEditAccessLoading(false)
+    }
+  }
+
+  const saveEditAccess = async () => {
+    if (!editAccessUser) return
+    setEditAccessSaving(true)
+    try {
+      const { error: profileErr } = await supabase
+        .from('user_profiles')
+        .update({ custom_access_enabled: editCustomAccess })
+        .eq('id', editAccessUser.id)
+      if (profileErr) throw profileErr
+
+      // Substitui registros de empresa (delete-all + insert)
+      const { error: delCompErr } = await supabase
+        .from('user_company_access')
+        .delete()
+        .eq('user_id', editAccessUser.id)
+      if (delCompErr) throw delCompErr
+
+      if (editCustomAccess && editSelectedCompanies.size > 0) {
+        const rows = Array.from(editSelectedCompanies).map(companyId => ({
+          user_id: editAccessUser.id,
+          company_id: companyId,
+          granted_by: userProfile?.id || null,
+        }))
+        const { error } = await supabase.from('user_company_access').insert(rows)
+        if (error) throw error
+      }
+
+      // Substitui exceções de credencial
+      const { error: delCredErr } = await supabase
+        .from('user_credential_exceptions')
+        .delete()
+        .eq('user_id', editAccessUser.id)
+      if (delCredErr) throw delCredErr
+
+      if (editCustomAccess && editExceptedCreds.size > 0) {
+        const rows = Array.from(editExceptedCreds).map(credId => ({
+          user_id: editAccessUser.id,
+          credential_id: credId,
+          created_by: userProfile?.id || null,
+        }))
+        const { error } = await supabase.from('user_credential_exceptions').insert(rows)
+        if (error) throw error
+      }
+
+      await fetchData()
+      setEditAccessUser(null)
+      Swal.fire({ title: 'Acessos salvos!', icon: 'success', timer: 2000, showConfirmButton: false })
+    } catch (err) {
+      Swal.fire({ title: 'Erro', text: err.message || 'Erro ao salvar acessos', icon: 'error' })
+    } finally {
+      setEditAccessSaving(false)
+    }
+  }
+
   const availableRoles = isSuperAdmin
     ? [{ value: 'básico', label: 'Básico' }, { value: 'admin', label: 'Admin' }]
     : [{ value: 'básico', label: 'Básico' }]
+
+  // Toggle de personalização visível quando o papel convidado pode ter acesso personalizado
+  const canCustomizeInviteAccess = inviteForm.role !== 'super_admin'
 
   if (!canAccess) {
     return (
@@ -246,7 +398,7 @@ export default function Users() {
 
       <main className="p-4 md:p-6 lg:p-8">
         <div className="max-w-5xl mx-auto">
-          {/* Page header */}
+          {/* Cabeçalho */}
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl font-bold text-ea-dark mb-1">Usuários</h1>
@@ -262,7 +414,7 @@ export default function Users() {
             </button>
           </div>
 
-          {/* Tabs */}
+          {/* Abas */}
           <div className="flex gap-1 bg-white rounded-lg shadow-sm border border-ea-border p-1 mb-6 w-fit">
             {isSuperAdmin && (
               <button
@@ -297,7 +449,7 @@ export default function Users() {
             </button>
           </div>
 
-          {/* Content */}
+          {/* Conteúdo */}
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-ea-primary" />
@@ -305,12 +457,16 @@ export default function Users() {
           ) : tab === 'todos' ? (
             <AllUsersTab
               users={allUsers}
+              currentUserId={userProfile?.id}
               editingUser={editingUser}
               newRole={newRole}
               onEditRole={(u) => { setEditingUser(u); setNewRole(u.role) }}
               onSaveRole={handleSaveRole}
               onCancelEdit={() => { setEditingUser(null); setNewRole('') }}
               onRoleChange={setNewRole}
+              onEditAccess={openEditAccess}
+              canManageAccess={canManageAccess}
+              isSuperAdmin={isSuperAdmin}
             />
           ) : (
             <PendingTab
@@ -324,8 +480,12 @@ export default function Users() {
         </div>
       </main>
 
-      {/* Invite Modal */}
-      <Modal isOpen={showInvite} onClose={() => setShowInvite(false)} title="Convidar Novo Usuário">
+      {/* ─── Modal: Convidar Usuário ─────────────────────────────────────────── */}
+      <Modal
+        isOpen={showInvite}
+        onClose={() => { setShowInvite(false); resetInviteState(); setInviteError(''); setInviteSuccess('') }}
+        title="Convidar Novo Usuário"
+      >
         <form onSubmit={handleInvite} className="space-y-4">
           {inviteError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
@@ -368,7 +528,10 @@ export default function Users() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Perfil de Acesso *</label>
             <select
               value={inviteForm.role}
-              onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}
+              onChange={(e) => {
+                setInviteForm({ ...inviteForm, role: e.target.value })
+                if (e.target.value === 'super_admin') setInviteCustomAccess(false)
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
             >
               {availableRoles.map((r) => (
@@ -380,10 +543,78 @@ export default function Users() {
             )}
           </div>
 
+          {/* Toggle de personalização de acesso */}
+          {canCustomizeInviteAccess && (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setInviteCustomAccess(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-ea-primary" />
+                  <span className="text-sm font-medium text-gray-700">Personalizar acessos</span>
+                  <span className="text-xs text-gray-500">— restringe o que esse usuário visualiza</span>
+                </div>
+                <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  inviteCustomAccess ? 'bg-ea-accent' : 'bg-gray-300'
+                }`}>
+                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                    inviteCustomAccess ? 'translate-x-5' : 'translate-x-1'
+                  }`} />
+                </div>
+              </button>
+
+              {inviteCustomAccess && (
+                <div className="p-4 space-y-2">
+                  <p className="text-xs text-gray-500 mb-3">
+                    Selecione as empresas que este usuário poderá visualizar. Dentro de cada empresa, todas as credenciais são visíveis por padrão — expanda para ocultar credenciais específicas.
+                  </p>
+                  <CustomAccessPanel
+                    companies={companies}
+                    selectedCompanyIds={inviteSelectedCompanies}
+                    exceptedCredentialIds={inviteExceptedCreds}
+                    credsByCompany={inviteCredsByCompany}
+                    onCompanyToggle={(id, checked) => {
+                      setInviteSelectedCompanies(prev => {
+                        const next = new Set(prev)
+                        if (checked) {
+                          next.add(id)
+                        } else {
+                          next.delete(id)
+                          // Remove exceções de credenciais desta empresa
+                          if (inviteCredsByCompany[id]) {
+                            const credIds = new Set(inviteCredsByCompany[id].map(c => c.id))
+                            setInviteExceptedCreds(prev2 => {
+                              const n = new Set(prev2)
+                              credIds.forEach(cid => n.delete(cid))
+                              return n
+                            })
+                          }
+                        }
+                        return next
+                      })
+                    }}
+                    onCredentialToggle={(credId, visible) => {
+                      setInviteExceptedCreds(prev => {
+                        const next = new Set(prev)
+                        if (visible) { next.delete(credId) } else { next.add(credId) }
+                        return next
+                      })
+                    }}
+                    onNeedCredentials={(companyId) =>
+                      loadCredentialsForCompany(companyId, inviteCredsByCompany, setInviteCredsByCompany)
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={() => setShowInvite(false)}
+              onClick={() => { setShowInvite(false); resetInviteState(); setInviteError(''); setInviteSuccess('') }}
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Cancelar
@@ -398,13 +629,233 @@ export default function Users() {
           </div>
         </form>
       </Modal>
+
+      {/* ─── Modal: Editar Acesso Personalizado ──────────────────────────────── */}
+      <Modal
+        isOpen={!!editAccessUser}
+        onClose={() => setEditAccessUser(null)}
+        title={`Acessos — ${editAccessUser?.full_name || ''}`}
+      >
+        {editAccessLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ea-primary" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Toggle */}
+            <button
+              type="button"
+              onClick={() => setEditCustomAccess(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-ea-primary" />
+                <span className="text-sm font-medium text-gray-700">Acesso personalizado</span>
+              </div>
+              <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                editCustomAccess ? 'bg-ea-accent' : 'bg-gray-300'
+              }`}>
+                <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                  editCustomAccess ? 'translate-x-5' : 'translate-x-1'
+                }`} />
+              </div>
+            </button>
+
+            {editCustomAccess ? (
+              <>
+                <p className="text-xs text-gray-500">
+                  Selecione as empresas e credenciais que este usuário poderá visualizar. Desligar o acesso personalizado libera tudo que o papel permite.
+                </p>
+                <CustomAccessPanel
+                  companies={companies}
+                  selectedCompanyIds={editSelectedCompanies}
+                  exceptedCredentialIds={editExceptedCreds}
+                  credsByCompany={editCredsByCompany}
+                  onCompanyToggle={(id, checked) => {
+                    setEditSelectedCompanies(prev => {
+                      const next = new Set(prev)
+                      if (checked) {
+                        next.add(id)
+                      } else {
+                        next.delete(id)
+                        if (editCredsByCompany[id]) {
+                          const credIds = new Set(editCredsByCompany[id].map(c => c.id))
+                          setEditExceptedCreds(prev2 => {
+                            const n = new Set(prev2)
+                            credIds.forEach(cid => n.delete(cid))
+                            return n
+                          })
+                        }
+                      }
+                      return next
+                    })
+                  }}
+                  onCredentialToggle={(credId, visible) => {
+                    setEditExceptedCreds(prev => {
+                      const next = new Set(prev)
+                      if (visible) { next.delete(credId) } else { next.add(credId) }
+                      return next
+                    })
+                  }}
+                  onNeedCredentials={(companyId) =>
+                    loadCredentialsForCompany(companyId, editCredsByCompany, setEditCredsByCompany)
+                  }
+                />
+              </>
+            ) : (
+              <p className="text-sm text-gray-500 py-2">
+                Com o acesso personalizado desligado, este usuário visualizará todas as empresas e credenciais permitidas pelo seu papel.
+              </p>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditAccessUser(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveEditAccess}
+                disabled={editAccessSaving}
+                className="flex-1 flex items-center justify-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4" />
+                {editAccessSaving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  )
+}
+
+// ─── Panel de seleção de empresas e credenciais ────────────────────────────────
+
+function CustomAccessPanel({
+  companies,
+  selectedCompanyIds,
+  exceptedCredentialIds,
+  credsByCompany,
+  onCompanyToggle,
+  onCredentialToggle,
+  onNeedCredentials,
+}) {
+  const [expanded, setExpanded] = useState(new Set())
+
+  const handleCompanyCheck = (companyId, checked) => {
+    onCompanyToggle(companyId, checked)
+    if (checked) {
+      setExpanded(prev => new Set([...prev, companyId]))
+      onNeedCredentials(companyId)
+    } else {
+      setExpanded(prev => { const n = new Set(prev); n.delete(companyId); return n })
+    }
+  }
+
+  const toggleExpand = (companyId) => {
+    if (!selectedCompanyIds.has(companyId)) return
+    setExpanded(prev => {
+      const n = new Set(prev)
+      if (n.has(companyId)) {
+        n.delete(companyId)
+      } else {
+        n.add(companyId)
+        onNeedCredentials(companyId)
+      }
+      return n
+    })
+  }
+
+  if (companies.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 py-4 text-center">Nenhuma empresa cadastrada.</p>
+    )
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100 max-h-72 overflow-y-auto">
+      {companies.map(company => {
+        const isSelected = selectedCompanyIds.has(company.id)
+        const isExpanded = expanded.has(company.id)
+        const creds = credsByCompany[company.id]
+
+        return (
+          <div key={company.id}>
+            <div className="flex items-center gap-3 px-3 py-2.5 bg-white hover:bg-gray-50">
+              <input
+                type="checkbox"
+                id={`ca-co-${company.id}`}
+                checked={isSelected}
+                onChange={(e) => handleCompanyCheck(company.id, e.target.checked)}
+                className="w-4 h-4 text-ea-primary rounded border-gray-300 focus:ring-ea-primary flex-shrink-0"
+              />
+              <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <label
+                htmlFor={`ca-co-${company.id}`}
+                className="flex-1 text-sm font-medium text-gray-800 cursor-pointer"
+              >
+                {company.name}
+              </label>
+              {isSelected && (
+                <button
+                  type="button"
+                  onClick={() => toggleExpand(company.id)}
+                  className="flex items-center gap-1 text-xs text-ea-primary hover:underline flex-shrink-0"
+                >
+                  {isExpanded
+                    ? <><ChevronDown className="w-3 h-3" /> Ocultar</>
+                    : <><ChevronRight className="w-3 h-3" /> Credenciais</>
+                  }
+                </button>
+              )}
+            </div>
+
+            {isSelected && isExpanded && (
+              <div className="bg-gray-50 border-t border-gray-100 px-3 py-2 pl-10 space-y-1.5">
+                {creds === undefined ? (
+                  <p className="text-xs text-gray-400 py-1">Carregando...</p>
+                ) : creds.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-1">Nenhuma credencial nesta empresa.</p>
+                ) : (
+                  creds.map(cred => {
+                    const isVisible = !exceptedCredentialIds.has(cred.id)
+                    return (
+                      <div key={cred.id} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`ca-cr-${cred.id}`}
+                          checked={isVisible}
+                          onChange={(e) => onCredentialToggle(cred.id, e.target.checked)}
+                          className="w-3.5 h-3.5 text-ea-primary rounded border-gray-300 focus:ring-ea-primary flex-shrink-0"
+                        />
+                        <Key className="w-3 h-3 text-gray-300 flex-shrink-0" />
+                        <label htmlFor={`ca-cr-${cred.id}`} className="text-xs text-gray-700 cursor-pointer">
+                          <span className="font-medium">{cred.name}</span>
+                          <span className="text-gray-400 ml-1">· {cred.type}</span>
+                        </label>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function AllUsersTab({ users, editingUser, newRole, onEditRole, onSaveRole, onCancelEdit, onRoleChange }) {
+function AllUsersTab({
+  users, currentUserId, editingUser, newRole,
+  onEditRole, onSaveRole, onCancelEdit, onRoleChange,
+  onEditAccess, canManageAccess, isSuperAdmin,
+}) {
   if (users.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow p-12 text-center">
@@ -429,19 +880,26 @@ function AllUsersTab({ users, editingUser, newRole, onEditRole, onSaveRole, onCa
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+            {users.map((u) => (
+              <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-ea-surface flex items-center justify-center flex-shrink-0">
                       <User className="w-4 h-4 text-ea-primary" />
                     </div>
-                    <span className="text-sm font-medium text-gray-900">{user.full_name}</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{u.full_name}</p>
+                      {u.custom_access_enabled && (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded mt-0.5">
+                          <Lock className="w-3 h-3" /> Acesso restrito
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </td>
-                <td className="py-3 px-4 text-sm text-gray-600">{user.email}</td>
+                <td className="py-3 px-4 text-sm text-gray-600">{u.email}</td>
                 <td className="py-3 px-4">
-                  {editingUser?.id === user.id ? (
+                  {editingUser?.id === u.id ? (
                     <div className="flex items-center gap-2">
                       <select
                         value={newRole}
@@ -452,42 +910,47 @@ function AllUsersTab({ users, editingUser, newRole, onEditRole, onSaveRole, onCa
                         <option value="admin">Admin</option>
                         <option value="super_admin">Super Admin</option>
                       </select>
-                      <button
-                        onClick={onSaveRole}
-                        className="p-1 text-green-600 hover:bg-green-50 rounded"
-                        title="Salvar"
-                      >
+                      <button onClick={onSaveRole} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Salvar">
                         <Save className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={onCancelEdit}
-                        className="p-1 text-gray-400 hover:bg-gray-100 rounded"
-                        title="Cancelar"
-                      >
+                      <button onClick={onCancelEdit} className="p-1 text-gray-400 hover:bg-gray-100 rounded" title="Cancelar">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   ) : (
-                    <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${ROLE_COLORS[user.role] || 'bg-gray-100 text-gray-700'}`}>
-                      {ROLE_LABELS[user.role] || user.role}
+                    <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${ROLE_COLORS[u.role] || 'bg-gray-100 text-gray-700'}`}>
+                      {ROLE_LABELS[u.role] || u.role}
                     </span>
                   )}
                 </td>
                 <td className="py-3 px-4">
-                  <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${STATUS_CONFIG[user.status]?.cls || 'bg-gray-100 text-gray-700'}`}>
-                    {STATUS_CONFIG[user.status]?.label || user.status}
+                  <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${STATUS_CONFIG[u.status]?.cls || 'bg-gray-100 text-gray-700'}`}>
+                    {STATUS_CONFIG[u.status]?.label || u.status}
                   </span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  {editingUser?.id !== user.id && (
-                    <button
-                      onClick={() => onEditRole(user)}
-                      className="p-1.5 text-ea-primary hover:bg-ea-surface rounded transition-colors"
-                      title="Editar perfil"
-                    >
-                      <Shield className="w-4 h-4" />
-                    </button>
-                  )}
+                  <div className="flex items-center justify-end gap-1">
+                    {/* Editar papel (apenas super_admin e para outros usuários) */}
+                    {isSuperAdmin && u.id !== currentUserId && editingUser?.id !== u.id && (
+                      <button
+                        onClick={() => onEditRole(u)}
+                        className="p-1.5 text-ea-primary hover:bg-ea-surface rounded transition-colors"
+                        title="Editar papel"
+                      >
+                        <Shield className="w-4 h-4" />
+                      </button>
+                    )}
+                    {/* Personalizar acessos */}
+                    {canManageAccess(u) && u.id !== currentUserId && editingUser?.id !== u.id && (
+                      <button
+                        onClick={() => onEditAccess(u)}
+                        className="p-1.5 text-ea-primary hover:bg-ea-surface rounded transition-colors"
+                        title="Personalizar acessos"
+                      >
+                        <Settings2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -497,36 +960,45 @@ function AllUsersTab({ users, editingUser, newRole, onEditRole, onSaveRole, onCa
 
       {/* Mobile */}
       <div className="md:hidden divide-y divide-gray-100">
-        {users.map((user) => (
-          <div key={user.id} className="p-4">
+        {users.map((u) => (
+          <div key={u.id} className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-full bg-ea-surface flex items-center justify-center flex-shrink-0">
                   <User className="w-5 h-5 text-ea-primary" />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-medium text-gray-900 truncate">{user.full_name}</p>
-                  <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                  <p className="font-medium text-gray-900 truncate">{u.full_name}</p>
+                  <p className="text-sm text-gray-500 truncate">{u.email}</p>
                   <div className="flex gap-2 mt-1 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_COLORS[user.role] || 'bg-gray-100'}`}>
-                      {ROLE_LABELS[user.role] || user.role}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_COLORS[u.role] || 'bg-gray-100'}`}>
+                      {ROLE_LABELS[u.role] || u.role}
                     </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CONFIG[user.status]?.cls || 'bg-gray-100'}`}>
-                      {STATUS_CONFIG[user.status]?.label || user.status}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CONFIG[u.status]?.cls || 'bg-gray-100'}`}>
+                      {STATUS_CONFIG[u.status]?.label || u.status}
                     </span>
+                    {u.custom_access_enabled && (
+                      <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                        <Lock className="w-3 h-3" /> Restrito
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
-              {editingUser?.id !== user.id && (
-                <button
-                  onClick={() => onEditRole(user)}
-                  className="p-1.5 text-ea-primary hover:bg-ea-surface rounded"
-                >
-                  <Shield className="w-4 h-4" />
-                </button>
-              )}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {isSuperAdmin && u.id !== currentUserId && editingUser?.id !== u.id && (
+                  <button onClick={() => onEditRole(u)} className="p-1.5 text-ea-primary hover:bg-ea-surface rounded">
+                    <Shield className="w-4 h-4" />
+                  </button>
+                )}
+                {canManageAccess(u) && u.id !== currentUserId && editingUser?.id !== u.id && (
+                  <button onClick={() => onEditAccess(u)} className="p-1.5 text-ea-primary hover:bg-ea-surface rounded">
+                    <Settings2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
-            {editingUser?.id === user.id && (
+            {editingUser?.id === u.id && (
               <div className="mt-3 flex items-center gap-2">
                 <select
                   value={newRole}
@@ -594,8 +1066,7 @@ function PendingTab({ pending, processing, isSuperAdmin, onApprove, onReject }) 
                     </span>
                     {u.invited_by_name ? (
                       <span className="text-xs text-gray-500">
-                        Convidado por{' '}
-                        <span className="font-medium text-gray-700">{u.invited_by_name}</span>
+                        Convidado por <span className="font-medium text-gray-700">{u.invited_by_name}</span>
                       </span>
                     ) : (
                       <span className="text-xs text-gray-400">Origem desconhecida</span>

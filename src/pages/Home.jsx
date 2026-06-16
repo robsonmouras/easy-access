@@ -5,7 +5,7 @@ import { useCompany } from '../contexts/CompanyContext'
 import { supabase } from '../lib/supabase'
 import Header from '../components/Header'
 import CompanyForm from '../components/CompanyForm'
-import { Building2, Plus, Search, Trash2, Key, ArrowRight } from 'lucide-react'
+import { Building2, Plus, Search, Trash2, Key, ArrowRight, MoreVertical, Pencil } from 'lucide-react'
 import Swal from 'sweetalert2'
 
 const Home = () => {
@@ -16,6 +16,8 @@ const Home = () => {
   const [companiesWithCount, setCompaniesWithCount] = useState([])
   const [loading, setLoading] = useState(false)
   const [showCompanyForm, setShowCompanyForm] = useState(false)
+  const [editingCompany, setEditingCompany] = useState(null)
+  const [openMenuId, setOpenMenuId] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const canManageCompanies = userProfile?.role === 'super_admin' || userProfile?.role === 'admin'
@@ -136,6 +138,10 @@ const Home = () => {
             </div>
           </div>
 
+          {openMenuId && (
+            <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)} />
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ea-primary"></div>
@@ -180,14 +186,36 @@ const Home = () => {
                       </div>
                     </div>
 
-                    {canDelete && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteClick(company) }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Deletar empresa"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                    {canManageCompanies && (
+                      <div className="relative z-50" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => setOpenMenuId(openMenuId === company.id ? null : company.id)}
+                          className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Opções"
+                        >
+                          <MoreVertical className="w-5 h-5" />
+                        </button>
+                        {openMenuId === company.id && (
+                          <div className="absolute right-0 top-9 bg-white border border-gray-200 shadow-lg rounded-lg z-50 py-1 min-w-[130px]">
+                            <button
+                              onClick={() => { setEditingCompany(company); setOpenMenuId(null) }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              <Pencil className="w-4 h-4" />
+                              Editar
+                            </button>
+                            {canDelete && (
+                              <button
+                                onClick={() => { handleDeleteClick(company); setOpenMenuId(null) }}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Excluir
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -210,8 +238,11 @@ const Home = () => {
         </div>
       </main>
 
-      {showCompanyForm && (
-        <CompanyForm onClose={() => setShowCompanyForm(false)} />
+      {(showCompanyForm || editingCompany) && (
+        <CompanyForm
+          company={editingCompany || null}
+          onClose={() => { setShowCompanyForm(false); setEditingCompany(null) }}
+        />
       )}
 
     </div>
