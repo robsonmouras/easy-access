@@ -1,35 +1,25 @@
-# V4 Access - Gerenciador de Credenciais
+# Easy Access — Gerenciador de Credenciais
 
-Sistema de gerenciamento de credenciais para a V4 Company, desenvolvido com React, Tailwind CSS e Supabase.
+Sistema interno de gerenciamento de credenciais, desenvolvido com React, Tailwind CSS e Supabase.
 
-## 🚀 Funcionalidades
+## Funcionalidades
 
-- ✅ Autenticação com validação de domínio @v4company.com
-- ✅ Três níveis de acesso: Super Admin, Admin e Básico
-- ✅ Gestão de empresas
-- ✅ CRUD de credenciais (Hospedagem, Servidor, Registro.br)
-- ✅ Busca e filtros
-- ✅ Interface responsiva (desktop e mobile)
-- ✅ Mostrar/ocultar senhas
-- ✅ Copiar credenciais com um clique
-- ✅ Gerenciamento de usuários (Super Admin)
+- Autenticação com aprovação de novos usuários por Super Admin
+- Três níveis de acesso: Super Admin, Admin e Básico
+- Sessão encerrada automaticamente após 8 horas
+- Gestão de empresas e credenciais
+- Tipos de credencial: Hospedagem, Servidor, Registro.br, WordPress, RD Station, FTP/SSH, MySQL
+- Busca e filtros por tipo
+- Interface responsiva (desktop e mobile)
+- Copiar login/senha com um clique
 
-## 📋 Pré-requisitos
-
-- Node.js 18+ e npm
-- Conta no Supabase
-- E-mail do domínio @v4company.com para cadastro
-
-## 🔧 Instalação
+## Instalação
 
 ```bash
-# Instalar dependências
 npm install
 ```
 
-## ⚙️ Configuração
-
-### 1. Configurar Variáveis de Ambiente
+## Variáveis de ambiente
 
 Crie um arquivo `.env` na raiz do projeto:
 
@@ -38,77 +28,42 @@ VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_ANON_KEY=sua_chave_anonima_aqui
 ```
 
-### 2. Configurar Banco de Dados
+> As chaves do Supabase ficam no painel em **Settings → API**.
 
-1. Acesse o painel do Supabase
-2. Vá em **SQL Editor**
-3. Execute o script do arquivo `supabase-schema.sql`
-
-### 3. Configurar Autenticação
-
-No Supabase, configure:
-- Site URL: `http://localhost:5173` (desenvolvimento)
-- Redirect URLs: `http://localhost:5173/**`
-
-📖 **Para instruções detalhadas, consulte o arquivo [CONFIGURACAO.md](./CONFIGURACAO.md)**
-
-## 🏃 Executar
+## Executar
 
 ```bash
-# Modo desenvolvimento
+# Desenvolvimento
 npm run dev
 
-# Build para produção
+# Build
 npm run build
 
-# Preview do build
-npm run preview
+# Deploy (GitHub Pages)
+npm run deploy
 ```
 
-## 👥 Perfis de Usuário
+## Perfis de acesso
 
-### Super Admin
-- Criar, editar e deletar credenciais
-- Criar, editar e deletar empresas
-- Gerenciar roles de usuários
+| Perfil | Permissões |
+|---|---|
+| **Super Admin** | Tudo + aprovar/rejeitar usuários + gerenciar roles |
+| **Admin** | Criar e editar empresas e credenciais (sem deletar) + convidar usuários básico |
+| **Básico** | Somente visualização |
 
-### Admin
-- Criar e editar credenciais
-- Criar e editar empresas
-- Não pode deletar
+> Super Admins só podem ser criados diretamente no banco de dados.
 
-### Básico
-- Visualizar credenciais
-- Não pode criar, editar ou deletar
+## Tecnologias
 
-## 🛠️ Tecnologias
+- React 18 + Vite
+- Tailwind CSS
+- Supabase (Auth + Database + RLS)
+- React Router
+- Lucide React
 
-- **React 18** - Framework UI
-- **Vite** - Build tool
-- **Tailwind CSS** - Estilização
-- **Supabase** - Backend (Auth + Database)
-- **React Router** - Roteamento
-- **Lucide React** - Ícones
+## Segurança
 
-## 📁 Estrutura do Projeto
-
-```
-src/
-├── components/      # Componentes reutilizáveis
-├── contexts/        # Context API (Auth, Company)
-├── lib/            # Configurações (Supabase)
-├── pages/          # Páginas da aplicação
-└── App.jsx         # Componente principal
-```
-
-## 🔒 Segurança
-
-- Validação de domínio de e-mail no frontend
-- Row Level Security (RLS) no Supabase
-- Políticas de acesso baseadas em roles
-- Senhas criptografadas no banco de dados
-
-## 📝 Licença
-
-Este projeto é propriedade da V4 Company.
-
+- Row Level Security (RLS) no banco de dados
+- Usuários pendentes não acessam dados mesmo com sessão válida
+- Sessão expira em 8 horas (frontend + JWT do Supabase)
+- Super Admin criado apenas via banco de dados

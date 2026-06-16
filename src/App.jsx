@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, '') || ''
 import { AuthProvider } from './contexts/AuthContext'
 import { CompanyProvider } from './contexts/CompanyContext'
 import Login from './pages/Login'
@@ -15,7 +17,7 @@ function App() {
   return (
     <AuthProvider>
       <CompanyProvider>
-        <Router>
+        <Router basename={BASE}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
