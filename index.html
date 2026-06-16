@@ -4,9 +4,28 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>V4 Access - Gerenciador de Credenciais</title>
-    <script type="module" crossorigin src="/v4-access/assets/index-CcMVUc1R.js"></script>
-    <link rel="stylesheet" crossorigin href="/v4-access/assets/index-DM70OHMJ.css">
+    <title>Easy Access - Gerenciador de Credenciais</title>
+    <script>
+      // Restaura rota SPA redirecionada pelo 404.html
+      (function() {
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+        }
+        var p = new URLSearchParams(location.search).get('p');
+        if (p) {
+          history.replaceState(null, null,
+            location.pathname.split('/').slice(0, 2).join('/') + p +
+            (location.search.slice(1).replace(/^p=.*?(&|$)/,'').replace(/~and~/g,'&') ? '?' : '') +
+            location.search.slice(1).replace(/^p=.*?(&|$)/,'').replace(/~and~/g,'&') +
+            location.hash
+          );
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/easy-access/assets/index-KX0hf-zl.js"></script>
+    <link rel="stylesheet" crossorigin href="/easy-access/assets/index-bbTMDep1.css">
   </head>
   <body>
     <div id="root"></div>
