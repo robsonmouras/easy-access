@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext({})
 
+const SESSION_KEY = 'ea_login_at'
+const SESSION_MAX_MS = 8 * 60 * 60 * 1000 // 8 horas
+
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
@@ -16,8 +19,24 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const forceSignOut = async () => {
+    localStorage.removeItem(SESSION_KEY)
+    await supabase.auth.signOut()
+    setUserProfile(null)
+  }
+
   useEffect(() => {
-    // Verificar sessão atual
+    // Verifica expiração de sessão ao montar e a cada 5 minutos
+    const checkExpiry = () => {
+      const loginAt = localStorage.getItem(SESSION_KEY)
+      if (loginAt && Date.now() - parseInt(loginAt) > SESSION_MAX_MS) {
+        forceSignOut()
+      }
+    }
+
+    checkExpiry()
+    const interval = setInterval(checkExpiry, 5 * 60 * 1000)
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
       if (session?.user) {
@@ -27,7 +46,6 @@ export const AuthProvider = ({ children }) => {
       }
     })
 
-    // Ouvir mudanças de autenticação
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -40,7 +58,10 @@ export const AuthProvider = ({ children }) => {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearInterval(interval)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const fetchUserProfile = async (userId) => {
@@ -61,35 +82,24 @@ export const AuthProvider = ({ children }) => {
   }
 
   const signUp = async (email, password, fullName) => {
-    // Validar domínio
-    if (!email.endsWith('@v4company.com')) {
-      throw new Error('Apenas e-mails do domínio @v4company.com são permitidos')
-    }
-
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
+      options: { data: { full_name: fullName } },
     })
 
     if (error) throw error
 
-    // Criar perfil do usuário com role padrão 'básico'
     if (data.user) {
       const { error: profileError } = await supabase
         .from('user_profiles')
-        .insert([
-          {
-            id: data.user.id,
-            email: email,
-            full_name: fullName,
-            role: 'básico',
-          },
-        ])
+        .insert([{
+          id: data.user.id,
+          email,
+          full_name: fullName,
+          role: 'básico',
+          status: 'pending',
+        }])
 
       if (profileError) throw profileError
     }
@@ -98,21 +108,36 @@ export const AuthProvider = ({ children }) => {
   }
 
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
 
     if (data.user) {
-      await fetchUserProfile(data.user.id)
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profile?.status === 'pending') {
+        await supabase.auth.signOut()
+        throw new Error('Sua conta está aguardando aprovação. Você receberá um e-mail quando for aprovado.')
+      }
+
+      if (profile?.status === 'rejected') {
+        await supabase.auth.signOut()
+        throw new Error('Seu acesso foi negado. Entre em contato com o administrador.')
+      }
+
+      localStorage.setItem(SESSION_KEY, Date.now().toString())
+      setUserProfile(profile)
+      setLoading(false)
     }
 
     return data
   }
 
   const signOut = async () => {
+    localStorage.removeItem(SESSION_KEY)
     const { error } = await supabase.auth.signOut()
     if (error) throw error
     setUserProfile(null)
@@ -120,9 +145,8 @@ export const AuthProvider = ({ children }) => {
 
   const resetPassword = async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/set-password`,
     })
-
     if (error) throw error
   }
 
@@ -133,7 +157,6 @@ export const AuthProvider = ({ children }) => {
       .eq('id', userId)
 
     if (error) throw error
-    await fetchUserProfile(userId)
   }
 
   const value = {
@@ -149,4 +172,3 @@ export const AuthProvider = ({ children }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
-

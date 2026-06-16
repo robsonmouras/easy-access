@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCompany } from '../contexts/CompanyContext'
@@ -146,7 +146,7 @@ const Dashboard = () => {
   })
 
   return (
-    <div className="min-h-screen bg-v4-light">
+    <div className="min-h-screen bg-ea-surface">
       <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       
       <div className="flex">
@@ -164,7 +164,7 @@ const Dashboard = () => {
               <div className="flex gap-3 justify-center">
                 <button
                   onClick={() => navigate('/')}
-                  className="flex items-center gap-2 bg-v4-primary text-white px-4 py-2 rounded-lg hover:bg-v4-secondary transition-colors"
+                  className="flex items-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
                 >
                   <HomeIcon className="w-4 h-4" />
                   Ver Todas as Empresas
@@ -172,7 +172,7 @@ const Dashboard = () => {
                 {companies.length === 0 && (
                   <button
                     onClick={() => setShowCompanyForm(true)}
-                    className="bg-v4-primary text-white px-4 py-2 rounded-lg hover:bg-v4-secondary transition-colors"
+                    className="bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
                   >
                     Criar Primeira Empresa
                   </button>
@@ -204,7 +204,7 @@ const Dashboard = () => {
                       <HomeIcon className="w-5 h-5 text-gray-600" />
                     </button>
                     <div>
-                      <h1 className="text-2xl font-bold text-v4-dark">
+                      <h1 className="text-2xl font-bold text-ea-dark">
                         Credenciais - {selectedCompany.name}
                       </h1>
                       <p className="text-gray-600 text-sm mt-1">
@@ -216,7 +216,7 @@ const Dashboard = () => {
                   {canCreate && (
                     <button
                       onClick={handleCreateCredential}
-                      className="flex items-center gap-2 bg-v4-primary text-white px-4 py-2 rounded-lg hover:bg-v4-secondary transition-colors"
+                      className="flex items-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
                     >
                       <Plus className="w-5 h-5" />
                       Nova Credencial
@@ -232,7 +232,7 @@ const Dashboard = () => {
                       placeholder="Buscar por nome, login ou empresa..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
                     />
                   </div>
 
@@ -241,12 +241,16 @@ const Dashboard = () => {
                     <select
                       value={filterType}
                       onChange={(e) => setFilterType(e.target.value)}
-                      className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent appearance-none bg-white"
+                      className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent appearance-none bg-white"
                     >
                       <option value="all">Todos os tipos</option>
                       <option value="hospedagem">Hospedagem</option>
                       <option value="servidor">Servidor</option>
                       <option value="registro.br">Registro.br</option>
+                      <option value="wordpress">WordPress</option>
+                      <option value="rd_station">RD Station</option>
+                      <option value="ftp_ssh">FTP/SSH</option>
+                      <option value="mysql">MySQL</option>
                     </select>
                   </div>
                 </div>

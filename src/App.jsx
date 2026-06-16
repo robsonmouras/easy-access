@@ -8,6 +8,7 @@ import SetPassword from './pages/SetPassword'
 import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import InviteUser from './pages/InviteUser'
+import UserApproval from './pages/UserApproval'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -41,6 +42,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <InviteUser />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user-approval"
+              element={
+                <ProtectedRoute>
+                  <UserApproval />
                 </ProtectedRoute>
               }
             />

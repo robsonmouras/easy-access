@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+﻿import { useNavigate } from 'react-router-dom'
 import { useCompany } from '../contexts/CompanyContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Building2, Plus, X } from 'lucide-react'
@@ -32,7 +32,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, showCompanyForm, setShowCompanyF
       >
         <div className="flex flex-col h-full">
           <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="font-semibold text-v4-dark">Empresas</h2>
+            <h2 className="font-semibold text-ea-dark">Empresas</h2>
             <button
               onClick={() => setSidebarOpen(false)}
               className="md:hidden p-1 hover:bg-gray-100 rounded"
@@ -61,7 +61,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, showCompanyForm, setShowCompanyF
                       flex items-center gap-3
                       ${
                         selectedCompany?.id === company.id
-                          ? 'bg-v4-primary text-white'
+                          ? 'bg-ea-primary text-white'
                           : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
                       }
                     `}
@@ -81,7 +81,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, showCompanyForm, setShowCompanyF
                   setShowCompanyForm(true)
                   setSidebarOpen(false)
                 }}
-                className="w-full flex items-center justify-center gap-2 bg-v4-accent text-white px-4 py-2 rounded-lg hover:bg-v4-primary transition-colors"
+                className="w-full flex items-center justify-center gap-2 bg-ea-accent text-white px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Nova Empresa

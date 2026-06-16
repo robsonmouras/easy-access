@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import V4Logo from '../components/V4Logo'
@@ -112,9 +112,9 @@ const SetPassword = () => {
 
   if (validating) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-v4-light">
+      <div className="min-h-screen flex items-center justify-center bg-ea-surface">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-v4-primary mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ea-primary mx-auto mb-4"></div>
           <p className="text-gray-600">Validando link...</p>
         </div>
       </div>
@@ -123,14 +123,14 @@ const SetPassword = () => {
 
   if (error && !password) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-v4-light px-4">
+      <div className="min-h-screen flex items-center justify-center bg-ea-surface px-4">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Link Inválido</h1>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
             onClick={() => navigate('/login')}
-            className="bg-v4-primary text-white px-4 py-2 rounded-lg hover:bg-v4-secondary transition-colors"
+            className="bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
           >
             Ir para Login
           </button>
@@ -141,7 +141,7 @@ const SetPassword = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-v4-light px-4">
+      <div className="min-h-screen flex items-center justify-center bg-ea-surface px-4">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Senha Definida!</h1>
@@ -154,13 +154,13 @@ const SetPassword = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-v4-light px-4">
+    <div className="min-h-screen flex items-center justify-center bg-ea-surface px-4">
       <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <V4Logo className="w-20 h-20" />
+            <V4Logo className="h-14 w-auto" />
           </div>
-          <h1 className="text-3xl font-bold text-v4-primary mb-2">Definir Senha</h1>
+          <h1 className="text-3xl font-bold text-ea-primary mb-2">Definir Senha</h1>
           <p className="text-gray-600">Crie uma senha segura para sua conta</p>
         </div>
 
@@ -184,7 +184,7 @@ const SetPassword = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
                 placeholder="Mínimo 6 caracteres"
               />
               <button
@@ -213,7 +213,7 @@ const SetPassword = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
                 placeholder="Confirme sua senha"
               />
               <button
@@ -233,7 +233,7 @@ const SetPassword = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-v4-primary text-white py-2 px-4 rounded-lg font-medium hover:bg-v4-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-ea-accent text-white py-2 px-4 rounded-lg font-semibold hover:bg-ea-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Definindo senha...' : 'Definir Senha'}
           </button>
@@ -242,7 +242,7 @@ const SetPassword = () => {
         <div className="mt-6 text-center">
           <button
             onClick={() => navigate('/login')}
-            className="text-sm text-v4-primary hover:underline"
+            className="text-sm text-ea-primary hover:underline"
           >
             Voltar para o login
           </button>

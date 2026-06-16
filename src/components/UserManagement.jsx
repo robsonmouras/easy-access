@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { User, Shield, UserCheck, Save, X } from 'lucide-react'
@@ -79,7 +79,7 @@ const UserManagement = ({ isOpen, onClose }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="Gerenciar Usuários">
       {loading ? (
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-v4-primary mx-auto"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ea-primary mx-auto"></div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -111,7 +111,7 @@ const UserManagement = ({ isOpen, onClose }) => {
                     <td className="py-3 px-3 text-right">
                       <button
                         onClick={() => handleEditRole(user)}
-                        className="p-1 text-v4-primary hover:bg-v4-light rounded"
+                        className="p-1 text-ea-primary hover:bg-ea-surface rounded"
                         title="Editar role"
                       >
                         <UserCheck className="w-4 h-4" />
@@ -132,7 +132,7 @@ const UserManagement = ({ isOpen, onClose }) => {
                 <select
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
                 >
                   <option value="básico">Básico</option>
                   <option value="admin">Admin</option>
@@ -140,7 +140,7 @@ const UserManagement = ({ isOpen, onClose }) => {
                 </select>
                 <button
                   onClick={handleSaveRole}
-                  className="flex items-center gap-2 bg-v4-primary text-white px-4 py-2 rounded-lg hover:bg-v4-secondary transition-colors"
+                  className="flex items-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   Salvar

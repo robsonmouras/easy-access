@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+﻿import { useEffect } from 'react'
 import { X } from 'lucide-react'
 
 const Modal = ({ isOpen, onClose, title, children }) => {
@@ -24,7 +24,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
       />
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-          <h2 className="text-xl font-bold text-v4-dark">{title}</h2>
+          <h2 className="text-xl font-bold text-ea-dark">{title}</h2>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded-lg transition-colors"

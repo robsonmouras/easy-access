@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Check } from 'lucide-react'
 import Modal from './Modal'
 
@@ -24,6 +24,10 @@ const CredentialCard = ({ credential, onEdit, onDelete, isTableRow }) => {
       hospedagem: 'Hospedagem',
       servidor: 'Servidor',
       'registro.br': 'Registro.br',
+      wordpress: 'WordPress',
+      rd_station: 'RD Station',
+      ftp_ssh: 'FTP/SSH',
+      mysql: 'MySQL',
     }
     return types[type] || type
   }
@@ -33,6 +37,10 @@ const CredentialCard = ({ credential, onEdit, onDelete, isTableRow }) => {
       hospedagem: 'bg-red-100 text-red-800',
       servidor: 'bg-green-100 text-green-800',
       'registro.br': 'bg-purple-100 text-purple-800',
+      wordpress: 'bg-blue-100 text-blue-800',
+      rd_station: 'bg-orange-100 text-orange-800',
+      ftp_ssh: 'bg-yellow-100 text-yellow-800',
+      mysql: 'bg-cyan-100 text-cyan-800',
     }
     return colors[type] || 'bg-gray-100 text-gray-800'
   }
@@ -70,7 +78,7 @@ const CredentialCard = ({ credential, onEdit, onDelete, isTableRow }) => {
               href={credential.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-sm text-v4-primary hover:underline"
+              className="flex items-center gap-1 text-sm text-ea-primary hover:underline"
             >
               <span className="truncate max-w-xs">{credential.link}</span>
               <ExternalLink className="w-4 h-4 flex-shrink-0" />
@@ -83,14 +91,14 @@ const CredentialCard = ({ credential, onEdit, onDelete, isTableRow }) => {
           <div className="flex items-center justify-end gap-2">
             <button
               onClick={() => setShowPasswordModal(true)}
-              className="text-v4-primary hover:text-v4-secondary text-sm"
+              className="text-ea-primary hover:text-ea-neutral-800 text-sm"
             >
               Ver Senha
             </button>
             {onEdit && (
               <button
                 onClick={() => onEdit(credential)}
-                className="p-1 text-v4-primary hover:text-v4-secondary hover:bg-gray-100 rounded"
+                className="p-1 text-ea-primary hover:text-ea-neutral-800 hover:bg-gray-100 rounded"
                 title="Editar"
               >
                 <Edit className="w-4 h-4" />
@@ -166,7 +174,7 @@ const CredentialCard = ({ credential, onEdit, onDelete, isTableRow }) => {
           {onEdit && (
             <button
               onClick={() => onEdit(credential)}
-              className="p-2 text-v4-primary hover:bg-v4-light rounded-lg"
+              className="p-2 text-ea-primary hover:bg-ea-surface rounded-lg"
             >
               <Edit className="w-5 h-5" />
             </button>
@@ -244,7 +252,7 @@ const CredentialCard = ({ credential, onEdit, onDelete, isTableRow }) => {
               href={credential.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 mt-1 text-sm text-v4-primary hover:underline"
+              className="flex items-center gap-2 mt-1 text-sm text-ea-primary hover:underline"
             >
               <span className="truncate">{credential.link}</span>
               <ExternalLink className="w-4 h-4 flex-shrink-0" />

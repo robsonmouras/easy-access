@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Mail, Lock, AlertCircle } from 'lucide-react'
@@ -28,14 +28,14 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-v4-light px-4">
+    <div className="min-h-screen flex items-center justify-center bg-ea-surface px-4">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
-              <V4Logo className="w-20 h-20" />
+              <V4Logo className="h-14 w-auto" />
             </div>
-            <h1 className="text-3xl font-bold text-v4-primary mb-2">V4 Access</h1>
+            <h1 className="text-3xl font-bold text-ea-primary mb-2">Easy Access</h1>
             <p className="text-gray-600">Gerenciador de Credenciais</p>
           </div>
 
@@ -59,8 +59,8 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
-                  placeholder="seu@v4company.com"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
+                  placeholder="seu@email.com"
                 />
               </div>
             </div>
@@ -77,7 +77,7 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
                   placeholder="••••••••"
                 />
               </div>
@@ -86,7 +86,7 @@ const Login = () => {
             <div className="text-right">
               <Link
                 to="/forgot-password"
-                className="text-sm text-v4-primary hover:underline"
+                className="text-sm text-ea-primary hover:underline"
               >
                 Esqueceu a senha?
               </Link>
@@ -95,7 +95,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-v4-primary text-white py-2 px-4 rounded-lg font-medium hover:bg-v4-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-ea-accent text-white py-2 px-4 rounded-lg font-semibold hover:bg-ea-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
@@ -104,7 +104,7 @@ const Login = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Não tem uma conta?{' '}
-              <Link to="/register" className="text-v4-primary font-medium hover:underline">
+              <Link to="/register" className="text-ea-primary font-medium hover:underline">
                 Cadastre-se
               </Link>
             </p>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Save } from 'lucide-react'
 import Modal from './Modal'
@@ -95,7 +95,7 @@ const CredentialForm = ({ credential, onClose, companyId }) => {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
               placeholder="Ex: Hospedagem Principal"
             />
           </div>
@@ -109,24 +109,28 @@ const CredentialForm = ({ credential, onClose, companyId }) => {
               value={formData.type}
               onChange={(e) => setFormData({ ...formData, type: e.target.value })}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
             >
               <option value="hospedagem">Hospedagem</option>
               <option value="servidor">Servidor</option>
               <option value="registro.br">Registro.br</option>
+              <option value="wordpress">WordPress</option>
+              <option value="rd_station">RD Station</option>
+              <option value="ftp_ssh">FTP/SSH</option>
+              <option value="mysql">MySQL</option>
             </select>
           </div>
 
           <div>
             <label htmlFor="link" className="block text-sm font-medium text-gray-700 mb-1">
-              Link / URL
+              Link / URL <span className="text-gray-400 font-normal">(opcional)</span>
             </label>
             <input
               id="link"
-              type="url"
+              type="text"
               value={formData.link}
               onChange={(e) => setFormData({ ...formData, link: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
               placeholder="https://..."
             />
           </div>
@@ -141,7 +145,7 @@ const CredentialForm = ({ credential, onClose, companyId }) => {
               value={formData.login}
               onChange={(e) => setFormData({ ...formData, login: e.target.value })}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
               placeholder="usuário ou e-mail"
             />
           </div>
@@ -156,7 +160,7 @@ const CredentialForm = ({ credential, onClose, companyId }) => {
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
               placeholder="••••••••"
             />
           </div>
@@ -165,14 +169,14 @@ const CredentialForm = ({ credential, onClose, companyId }) => {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-2 border-2 border-ea-primary rounded-lg text-ea-primary font-medium hover:bg-ea-primary hover:text-white transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 flex items-center justify-center gap-2 bg-v4-primary text-white px-4 py-2 rounded-lg hover:bg-v4-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4" />
               {loading ? 'Salvando...' : 'Salvar'}

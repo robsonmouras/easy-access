@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { AlertTriangle, X, Trash2 } from 'lucide-react'
 import Modal from './Modal'
 
@@ -67,7 +67,7 @@ const DeleteCompanyModal = ({ company, onClose, onConfirm }) => {
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 border-2 border-ea-primary rounded-lg text-ea-primary font-medium hover:bg-ea-primary hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancelar
           </button>

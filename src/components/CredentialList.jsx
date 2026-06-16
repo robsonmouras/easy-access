@@ -1,11 +1,11 @@
-import CredentialCard from './CredentialCard'
+﻿import CredentialCard from './CredentialCard'
 import { Loader2 } from 'lucide-react'
 
 const CredentialList = ({ credentials, loading, onEdit, onDelete }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-v4-primary" />
+        <Loader2 className="w-8 h-8 animate-spin text-ea-primary" />
       </div>
     )
   }

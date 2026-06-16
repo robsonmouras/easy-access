@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCompany } from '../contexts/CompanyContext'
@@ -91,7 +91,7 @@ const Home = () => {
   }
 
   return (
-    <div className="min-h-screen bg-v4-light">
+    <div className="min-h-screen bg-ea-surface">
       <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
       <main className="p-4 md:p-6 lg:p-8">
@@ -99,7 +99,7 @@ const Home = () => {
           <div className="mb-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
               <div>
-                <h1 className="text-3xl font-bold text-v4-dark mb-2">Empresas</h1>
+                <h1 className="text-3xl font-bold text-ea-dark mb-2">Empresas</h1>
                 <p className="text-gray-600">
                   {companiesWithCount.length} empresa(s) cadastrada(s)
                 </p>
@@ -108,7 +108,7 @@ const Home = () => {
               {canManageCompanies && (
                 <button
                   onClick={() => setShowCompanyForm(true)}
-                  className="flex items-center gap-2 bg-v4-primary text-white px-4 py-2 rounded-lg hover:bg-v4-secondary transition-colors"
+                  className="flex items-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
                 >
                   <Plus className="w-5 h-5" />
                   Nova Empresa
@@ -123,14 +123,14 @@ const Home = () => {
                 placeholder="Buscar empresas por nome ou descrição..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
               />
             </div>
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-v4-primary"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ea-primary"></div>
             </div>
           ) : companiesWithCount.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-8 text-center">
@@ -141,7 +141,7 @@ const Home = () => {
               {canManageCompanies && !searchTerm && (
                 <button
                   onClick={() => setShowCompanyForm(true)}
-                  className="bg-v4-primary text-white px-4 py-2 rounded-lg hover:bg-v4-secondary transition-colors"
+                  className="bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
                 >
                   Criar Primeira Empresa
                 </button>
@@ -157,8 +157,8 @@ const Home = () => {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3 flex-1">
-                      <div className="p-3 bg-v4-primary bg-opacity-10 rounded-lg">
-                        <Building2 className="w-6 h-6 text-v4-primary" />
+                      <div className="p-3 bg-ea-primary bg-opacity-10 rounded-lg">
+                        <Building2 className="w-6 h-6 text-ea-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-lg text-gray-900 truncate">
@@ -193,7 +193,7 @@ const Home = () => {
                         {company.credentialsCount} credencial{company.credentialsCount !== 1 ? 'is' : ''}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-v4-primary text-sm font-medium">
+                    <div className="flex items-center gap-2 text-ea-primary text-sm font-medium">
                       <span>Ver credenciais</span>
                       <ArrowRight className="w-4 h-4" />
                     </div>

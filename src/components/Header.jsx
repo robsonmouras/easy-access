@@ -1,7 +1,7 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { LogOut, Menu, User, Settings, Home as HomeIcon, UserPlus } from 'lucide-react'
+import { LogOut, Menu, User, Settings, Home as HomeIcon, UserPlus, ClipboardList } from 'lucide-react'
 import UserManagement from './UserManagement'
 import V4Logo from './V4Logo'
 
@@ -37,8 +37,7 @@ const Header = ({ sidebarOpen, setSidebarOpen }) => {
             <Menu className="w-6 h-6 text-gray-600" />
           </button>
           <div className="flex items-center gap-3">
-            <V4Logo className="w-8 h-8" />
-            <h1 className="text-xl font-bold text-v4-primary">V4 Access</h1>
+            <V4Logo className="h-8 w-auto" />
           </div>
         </div>
 
@@ -57,20 +56,31 @@ const Header = ({ sidebarOpen, setSidebarOpen }) => {
           <div className="hidden md:flex items-center gap-2 text-sm text-gray-600">
             <User className="w-4 h-4" />
             <span>{userProfile?.full_name || 'Usuário'}</span>
-            <span className="px-2 py-1 bg-v4-light rounded text-xs">
+            <span className="px-2 py-1 bg-ea-surface rounded text-xs">
               {getRoleLabel(userProfile?.role)}
             </span>
           </div>
 
+          {(userProfile?.role === 'super_admin' || userProfile?.role === 'admin') && (
+            <button
+              onClick={() => navigate('/invite-user')}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Convidar novo usuário"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span className="hidden md:inline">Convidar</span>
+            </button>
+          )}
+
           {userProfile?.role === 'super_admin' && (
             <>
               <button
-                onClick={() => navigate('/invite-user')}
+                onClick={() => navigate('/user-approval')}
                 className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Convidar novo usuário"
+                title="Aprovar usuários pendentes"
               >
-                <UserPlus className="w-4 h-4" />
-                <span className="hidden md:inline">Convidar</span>
+                <ClipboardList className="w-4 h-4" />
+                <span className="hidden md:inline">Aprovações</span>
               </button>
               <button
                 onClick={() => setShowUserManagement(true)}

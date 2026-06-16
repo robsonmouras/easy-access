@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react'
@@ -46,15 +46,15 @@ const Register = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-v4-light px-4">
+    <div className="min-h-screen flex items-center justify-center bg-ea-surface px-4">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
-              <V4Logo className="w-20 h-20" />
+              <V4Logo className="h-14 w-auto" />
             </div>
-            <h1 className="text-3xl font-bold text-v4-primary mb-2">Criar Conta</h1>
-            <p className="text-gray-600">Apenas e-mails @v4company.com</p>
+            <h1 className="text-3xl font-bold text-ea-primary mb-2">Criar Conta</h1>
+            <p className="text-gray-600">Crie sua conta para acessar o sistema</p>
           </div>
 
           {error && (
@@ -84,7 +84,7 @@ const Register = () => {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   required
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
                   placeholder="Seu nome completo"
                 />
               </div>
@@ -102,11 +102,10 @@ const Register = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
-                  placeholder="seu@v4company.com"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
+                  placeholder="seu@email.com"
                 />
               </div>
-              <p className="mt-1 text-xs text-gray-500">Apenas e-mails do domínio @v4company.com</p>
             </div>
 
             <div>
@@ -121,7 +120,7 @@ const Register = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
                   placeholder="Mínimo 6 caracteres"
                 />
               </div>
@@ -139,7 +138,7 @@ const Register = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-v4-primary focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
                   placeholder="Confirme sua senha"
                 />
               </div>
@@ -148,7 +147,7 @@ const Register = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-v4-primary text-white py-2 px-4 rounded-lg font-medium hover:bg-v4-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-ea-accent text-white py-2 px-4 rounded-lg font-semibold hover:bg-ea-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Criando conta...' : 'Criar Conta'}
             </button>
@@ -157,7 +156,7 @@ const Register = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Já tem uma conta?{' '}
-              <Link to="/login" className="text-v4-primary font-medium hover:underline">
+              <Link to="/login" className="text-ea-primary font-medium hover:underline">
                 Faça login
               </Link>
             </p>
