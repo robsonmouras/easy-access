@@ -11,6 +11,7 @@ import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import InviteUser from './pages/InviteUser'
 import UserApproval from './pages/UserApproval'
+import Users from './pages/Users'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -52,6 +53,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <UserApproval />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute>
+                  <Users />
                 </ProtectedRoute>
               }
             />

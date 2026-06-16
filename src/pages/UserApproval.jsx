@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import Header from '../components/Header'
 import { CheckCircle, XCircle, Clock, AlertCircle, User } from 'lucide-react'
+import Swal from 'sweetalert2'
 
 const UserApproval = () => {
   const { userProfile } = useAuth()
@@ -55,14 +56,24 @@ const UserApproval = () => {
       await fetchPending()
     } catch (err) {
       console.error('Erro ao aprovar:', err)
-      alert('Erro ao aprovar usuário: ' + err.message)
+      Swal.fire({ title: 'Erro', text: 'Erro ao aprovar usuário: ' + err.message, icon: 'error' })
     } finally {
       setProcessing(null)
     }
   }
 
   const handleReject = async (userId) => {
-    if (!window.confirm('Tem certeza que deseja rejeitar este usuário?')) return
+    const { isConfirmed } = await Swal.fire({
+      title: 'Rejeitar usuário?',
+      text: 'O usuário não terá acesso ao sistema.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Rejeitar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+    })
+    if (!isConfirmed) return
     setProcessing(userId)
     try {
       const { error } = await supabase
@@ -74,7 +85,7 @@ const UserApproval = () => {
       await fetchPending()
     } catch (err) {
       console.error('Erro ao rejeitar:', err)
-      alert('Erro ao rejeitar usuário: ' + err.message)
+      Swal.fire({ title: 'Erro', text: 'Erro ao rejeitar usuário: ' + err.message, icon: 'error' })
     } finally {
       setProcessing(null)
     }

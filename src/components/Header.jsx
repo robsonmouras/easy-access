@@ -1,15 +1,12 @@
-﻿import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+﻿import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { LogOut, Menu, User, Settings, Home as HomeIcon, UserPlus, ClipboardList } from 'lucide-react'
-import UserManagement from './UserManagement'
+import { LogOut, Menu, User, Users, Home as HomeIcon } from 'lucide-react'
 import V4Logo from './V4Logo'
 
 const Header = ({ sidebarOpen, setSidebarOpen }) => {
   const { userProfile, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [showUserManagement, setShowUserManagement] = useState(false)
   const isHome = location.pathname === '/'
 
   const handleSignOut = async () => {
@@ -63,34 +60,13 @@ const Header = ({ sidebarOpen, setSidebarOpen }) => {
 
           {(userProfile?.role === 'super_admin' || userProfile?.role === 'admin') && (
             <button
-              onClick={() => navigate('/invite-user')}
+              onClick={() => navigate('/users')}
               className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Convidar novo usuário"
+              title="Gerenciar usuários"
             >
-              <UserPlus className="w-4 h-4" />
-              <span className="hidden md:inline">Convidar</span>
+              <Users className="w-4 h-4" />
+              <span className="hidden md:inline">Usuários</span>
             </button>
-          )}
-
-          {userProfile?.role === 'super_admin' && (
-            <>
-              <button
-                onClick={() => navigate('/user-approval')}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Aprovar usuários pendentes"
-              >
-                <ClipboardList className="w-4 h-4" />
-                <span className="hidden md:inline">Aprovações</span>
-              </button>
-              <button
-                onClick={() => setShowUserManagement(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Gerenciar usuários"
-              >
-                <Settings className="w-4 h-4" />
-                <span className="hidden md:inline">Usuários</span>
-              </button>
-            </>
           )}
 
           <button
@@ -102,10 +78,6 @@ const Header = ({ sidebarOpen, setSidebarOpen }) => {
           </button>
         </div>
 
-        <UserManagement
-          isOpen={showUserManagement}
-          onClose={() => setShowUserManagement(false)}
-        />
       </div>
     </header>
   )

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { User, Shield, UserCheck, Save, X } from 'lucide-react'
 import Modal from './Modal'
+import Swal from 'sweetalert2'
 
 const UserManagement = ({ isOpen, onClose }) => {
   const { userProfile, updateUserRole } = useAuth()
@@ -49,7 +50,7 @@ const UserManagement = ({ isOpen, onClose }) => {
       setNewRole('')
     } catch (error) {
       console.error('Erro ao atualizar role:', error)
-      alert('Erro ao atualizar role do usuário')
+      Swal.fire({ title: 'Erro', text: 'Não foi possível atualizar o perfil do usuário.', icon: 'error' })
     }
   }
 

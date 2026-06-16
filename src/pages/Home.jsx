@@ -5,8 +5,8 @@ import { useCompany } from '../contexts/CompanyContext'
 import { supabase } from '../lib/supabase'
 import Header from '../components/Header'
 import CompanyForm from '../components/CompanyForm'
-import DeleteCompanyModal from '../components/DeleteCompanyModal'
 import { Building2, Plus, Search, Trash2, Key, ArrowRight } from 'lucide-react'
+import Swal from 'sweetalert2'
 
 const Home = () => {
   const { userProfile } = useAuth()
@@ -16,8 +16,6 @@ const Home = () => {
   const [companiesWithCount, setCompaniesWithCount] = useState([])
   const [loading, setLoading] = useState(false)
   const [showCompanyForm, setShowCompanyForm] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [companyToDelete, setCompanyToDelete] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const canManageCompanies = userProfile?.role === 'super_admin' || userProfile?.role === 'admin'
@@ -61,26 +59,36 @@ const Home = () => {
     }
   }
 
-  const handleDeleteClick = (company) => {
-    setCompanyToDelete(company)
-    setShowDeleteModal(true)
-  }
+  const handleDeleteClick = async (company) => {
+    const { value: typed } = await Swal.fire({
+      title: 'Deletar Empresa',
+      html: `
+        <p class="text-sm text-gray-600 mb-3">Esta ação irá deletar permanentemente a empresa <strong>${company.name}</strong> e todas as suas credenciais. Esta ação não pode ser desfeita.</p>
+        <p class="text-sm font-medium text-gray-700 mb-1">Para confirmar, digite o nome da empresa:</p>
+      `,
+      input: 'text',
+      inputPlaceholder: company.name,
+      inputAttributes: { autocomplete: 'off' },
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Deletar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      inputValidator: (value) => {
+        if (value !== company.name) return 'O nome digitado não corresponde ao nome da empresa.'
+      },
+    })
 
-  const handleDeleteConfirm = async () => {
-    if (!companyToDelete) return
+    if (typed !== company.name) return
 
     try {
-      await deleteCompany(companyToDelete.id)
-      setShowDeleteModal(false)
-      setCompanyToDelete(null)
-      // O fetchCompanies será chamado automaticamente pelo CompanyContext
-      // Mas vamos garantir que a lista seja atualizada
-      setTimeout(() => {
-        fetchCompaniesWithCredentials()
-      }, 500)
+      await deleteCompany(company.id)
+      Swal.fire({ title: 'Empresa deletada!', icon: 'success', timer: 2000, showConfirmButton: false })
+      setTimeout(() => fetchCompaniesWithCredentials(), 500)
     } catch (error) {
       console.error('Erro ao deletar empresa:', error)
-      alert('Erro ao deletar empresa. Tente novamente.')
+      Swal.fire({ title: 'Erro', text: 'Não foi possível deletar a empresa. Tente novamente.', icon: 'error' })
     }
   }
 
@@ -174,10 +182,7 @@ const Home = () => {
 
                     {canDelete && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteClick(company)
-                        }}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteClick(company) }}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         title="Deletar empresa"
                       >
@@ -209,16 +214,6 @@ const Home = () => {
         <CompanyForm onClose={() => setShowCompanyForm(false)} />
       )}
 
-      {showDeleteModal && companyToDelete && (
-        <DeleteCompanyModal
-          company={companyToDelete}
-          onClose={() => {
-            setShowDeleteModal(false)
-            setCompanyToDelete(null)
-          }}
-          onConfirm={handleDeleteConfirm}
-        />
-      )}
     </div>
   )
 }

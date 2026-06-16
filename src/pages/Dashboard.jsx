@@ -9,6 +9,7 @@ import CredentialList from '../components/CredentialList'
 import CredentialForm from '../components/CredentialForm'
 import CompanyForm from '../components/CompanyForm'
 import { Plus, Search, Filter, Home as HomeIcon } from 'lucide-react'
+import Swal from 'sweetalert2'
 
 const Dashboard = () => {
   const { userProfile } = useAuth()
@@ -112,9 +113,18 @@ const Dashboard = () => {
   }
 
   const handleDeleteCredential = async (id) => {
-    if (!window.confirm('Tem certeza que deseja deletar esta credencial?')) {
-      return
-    }
+    const { isConfirmed } = await Swal.fire({
+      title: 'Deletar credencial?',
+      text: 'Esta ação não pode ser desfeita.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Deletar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+    })
+
+    if (!isConfirmed) return
 
     try {
       const { error } = await supabase
@@ -126,7 +136,7 @@ const Dashboard = () => {
       await fetchCredentials()
     } catch (error) {
       console.error('Erro ao deletar credencial:', error)
-      alert('Erro ao deletar credencial')
+      Swal.fire({ title: 'Erro', text: 'Não foi possível deletar a credencial.', icon: 'error' })
     }
   }
 
