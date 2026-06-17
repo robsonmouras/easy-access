@@ -20,15 +20,47 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterType, setFilterType] = useState('all')
   const [showCredentialForm, setShowCredentialForm] = useState(false)
   const [showCompanyForm, setShowCompanyForm] = useState(false)
   const [editingCredential, setEditingCredential] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const canCreate = userProfile?.role === 'super_admin' || userProfile?.role === 'admin'
-  const canEdit = userProfile?.role === 'super_admin' || userProfile?.role === 'admin'
-  const canDelete = userProfile?.role === 'super_admin'
+  // Carrega tipos visíveis ao usuário (para o filtro)
+  useEffect(() => {
+    if (userProfile) loadTiposVisiveis()
+  }, [userProfile])
+
+  const loadTiposVisiveis = async () => {
+    try {
+      const isSA = userProfile?.is_super_admin === true || userProfile?.role === 'super_admin'
+      if (isSA) {
+        const { data } = await supabase
+          .from('tipos_credencial')
+          .select('id, nome, categoria')
+          .order('categoria, nome')
+        setTiposVisiveis(data || [])
+      } else {
+        const { data: ids } = await supabase.rpc('tipos_visiveis', { p_usuario_id: userProfile.id })
+        if (!ids || ids.length === 0) { setTiposVisiveis([]); return }
+        const { data } = await supabase
+          .from('tipos_credencial')
+          .select('id, nome, categoria')
+          .in('id', ids.map(r => r.tipo_credencial_id))
+          .order('categoria, nome')
+        setTiposVisiveis(data || [])
+      }
+    } catch (err) {
+      console.error('Erro ao carregar tipos visíveis:', err)
+    }
+  }
+
+  const isSuperAdmin = userProfile?.is_super_admin === true || userProfile?.role === 'super_admin'
+  const canCreate    = isSuperAdmin || !!userProfile?.pode_criar_credencial
+  const canEdit      = isSuperAdmin || !!userProfile?.pode_editar_credencial
+  const canDelete    = isSuperAdmin || !!userProfile?.pode_excluir_credencial
+
+  const [tiposVisiveis, setTiposVisiveis] = useState([])
+  const [filterTipoId, setFilterTipoId] = useState('all')
 
   // Verificar se há empresa na URL
   useEffect(() => {
@@ -57,7 +89,7 @@ const Dashboard = () => {
       setError('')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCompany, filterType])
+  }, [selectedCompany, filterTipoId])
 
   const fetchCredentials = async () => {
     if (!selectedCompany) {
@@ -74,12 +106,12 @@ const Dashboard = () => {
     try {
       let query = supabase
         .from('credentials')
-        .select('*')
+        .select('*, tipos_credencial(id, nome, categoria)')
         .eq('company_id', selectedCompany.id)
         .order('created_at', { ascending: false })
 
-      if (filterType !== 'all') {
-        query = query.eq('type', filterType)
+      if (filterTipoId !== 'all') {
+        query = query.eq('tipo_credencial_id', filterTipoId)
       }
 
       const { data, error: queryError } = await query
@@ -246,23 +278,21 @@ const Dashboard = () => {
                     />
                   </div>
 
-                  <div className="relative">
-                    <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <select
-                      value={filterType}
-                      onChange={(e) => setFilterType(e.target.value)}
-                      className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent appearance-none bg-white"
-                    >
-                      <option value="all">Todos os tipos</option>
-                      <option value="hospedagem">Hospedagem</option>
-                      <option value="servidor">Servidor</option>
-                      <option value="registro.br">Registro.br</option>
-                      <option value="wordpress">WordPress</option>
-                      <option value="rd_station">RD Station</option>
-                      <option value="ftp_ssh">FTP/SSH</option>
-                      <option value="mysql">MySQL</option>
-                    </select>
-                  </div>
+                  {tiposVisiveis.length > 0 && (
+                    <div className="relative">
+                      <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <select
+                        value={filterTipoId}
+                        onChange={(e) => setFilterTipoId(e.target.value)}
+                        className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent appearance-none bg-white"
+                      >
+                        <option value="all">Todos os tipos</option>
+                        {tiposVisiveis.map((t) => (
+                          <option key={t.id} value={t.id}>{t.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
 

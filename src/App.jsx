@@ -11,6 +11,8 @@ import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import UserApproval from './pages/UserApproval'
 import Users from './pages/Users'
+import Cargos from './pages/Cargos'
+import TiposCredencial from './pages/TiposCredencial'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -56,6 +58,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Users />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cargos"
+              element={
+                <ProtectedRoute>
+                  <Cargos />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tipos-credencial"
+              element={
+                <ProtectedRoute>
+                  <TiposCredencial />
                 </ProtectedRoute>
               }
             />

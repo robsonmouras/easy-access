@@ -8,7 +8,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, showCompanyForm, setShowCompanyF
   const { userProfile } = useAuth()
   const navigate = useNavigate()
 
-  const canManageCompanies = userProfile?.role === 'super_admin' || userProfile?.role === 'admin'
+  const isSuperAdmin     = userProfile?.is_super_admin === true || userProfile?.role === 'super_admin'
+  const canCreateCompany = isSuperAdmin || !!userProfile?.pode_criar_empresa
 
   return (
     <>
@@ -74,7 +75,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, showCompanyForm, setShowCompanyF
             )}
           </div>
 
-          {canManageCompanies && (
+          {canCreateCompany && (
             <div className="p-4 border-t border-gray-200">
               <button
                 onClick={() => {

@@ -1,6 +1,27 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Check } from 'lucide-react'
 import Modal from './Modal'
+
+// Cores por categoria — cobre todas as categorias do seed; fallback para gray
+const CATEGORIA_COLORS = {
+  'Desenvolvimento & Infraestrutura': 'bg-blue-100 text-blue-800',
+  'CMS & Plataformas de Site':        'bg-indigo-100 text-indigo-800',
+  'Redes Sociais':                    'bg-pink-100 text-pink-800',
+  'Marketing & Tráfego Pago':         'bg-orange-100 text-orange-800',
+  'Email Marketing & CRM':            'bg-amber-100 text-amber-800',
+  'Design & Produção':                'bg-purple-100 text-purple-800',
+  'Financeiro & Administrativo':      'bg-green-100 text-green-800',
+  'Atendimento & Suporte':            'bg-teal-100 text-teal-800',
+  'Gestão Interna':                   'bg-gray-100 text-gray-800',
+}
+
+const getTipoBadgeClass = (credential) => {
+  const categoria = credential.tipos_credencial?.categoria
+  return CATEGORIA_COLORS[categoria] || 'bg-gray-100 text-gray-800'
+}
+
+const getTipoNome = (credential) =>
+  credential.tipos_credencial?.nome || 'Sem tipo'
 
 const CredentialCard = ({ credential, onEdit, onDelete, isTableRow }) => {
   const [showPassword, setShowPassword] = useState(false)
@@ -19,38 +40,12 @@ const CredentialCard = ({ credential, onEdit, onDelete, isTableRow }) => {
     }
   }
 
-  const getTypeLabel = (type) => {
-    const types = {
-      hospedagem: 'Hospedagem',
-      servidor: 'Servidor',
-      'registro.br': 'Registro.br',
-      wordpress: 'WordPress',
-      rd_station: 'RD Station',
-      ftp_ssh: 'FTP/SSH',
-      mysql: 'MySQL',
-    }
-    return types[type] || type
-  }
-
-  const getTypeColor = (type) => {
-    const colors = {
-      hospedagem: 'bg-red-100 text-red-800',
-      servidor: 'bg-green-100 text-green-800',
-      'registro.br': 'bg-purple-100 text-purple-800',
-      wordpress: 'bg-blue-100 text-blue-800',
-      rd_station: 'bg-orange-100 text-orange-800',
-      ftp_ssh: 'bg-yellow-100 text-yellow-800',
-      mysql: 'bg-cyan-100 text-cyan-800',
-    }
-    return colors[type] || 'bg-gray-100 text-gray-800'
-  }
-
   if (isTableRow) {
     return (
       <tr className="hover:bg-gray-50">
         <td className="px-6 py-4 whitespace-nowrap">
-          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(credential.type)}`}>
-            {getTypeLabel(credential.type)}
+          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTipoBadgeClass(credential)}`}>
+            {getTipoNome(credential)}
           </span>
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
@@ -166,8 +161,8 @@ const CredentialCard = ({ credential, onEdit, onDelete, isTableRow }) => {
       <div className="flex items-start justify-between mb-3">
         <div>
           <h3 className="font-semibold text-gray-900">{credential.name}</h3>
-          <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(credential.type)}`}>
-            {getTypeLabel(credential.type)}
+          <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full ${getTipoBadgeClass(credential)}`}>
+            {getTipoNome(credential)}
           </span>
         </div>
         <div className="flex gap-2">
@@ -265,4 +260,3 @@ const CredentialCard = ({ credential, onEdit, onDelete, isTableRow }) => {
 }
 
 export default CredentialCard
-

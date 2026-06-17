@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCompany } from '../contexts/CompanyContext'
 import { supabase } from '../lib/supabase'
@@ -6,61 +7,62 @@ import Header from '../components/Header'
 import Modal from '../components/Modal'
 import {
   Users as UsersIcon, Clock, UserPlus, CheckCircle, XCircle,
-  User, Shield, AlertCircle, Save, X, Lock, Settings2,
-  ChevronDown, ChevronRight, Building2, Key,
+  User, AlertCircle, Save, Building2, Settings2, Shield, Search,
 } from 'lucide-react'
 import Swal from 'sweetalert2'
 
-const ROLE_LABELS = { super_admin: 'Super Admin', admin: 'Admin', básico: 'Básico' }
-const ROLE_COLORS = {
-  super_admin: 'bg-purple-100 text-purple-800',
-  admin: 'bg-blue-100 text-blue-800',
-  básico: 'bg-gray-100 text-gray-700',
-}
 const STATUS_CONFIG = {
   active:   { label: 'Ativo',     cls: 'bg-green-100 text-green-800' },
   pending:  { label: 'Pendente',  cls: 'bg-yellow-100 text-yellow-800' },
   rejected: { label: 'Rejeitado', cls: 'bg-red-100 text-red-800' },
 }
 
+function defaultPerms() {
+  return {
+    isSuperAdmin: false,
+    cargoId: '',
+    tiposExtra: [],
+    podeVerTodasEmpresas: true,
+    empresas: [],
+    podeCriarEmpresa: false,
+    podeEditarEmpresa: false,
+    podeExcluirEmpresa: false,
+    podeCriarCredencial: false,
+    podeEditarCredencial: false,
+    podeExcluirCredencial: false,
+  }
+}
+
 export default function Users() {
-  const { userProfile, updateUserRole } = useAuth()
+  const { userProfile } = useAuth()
   const { companies } = useCompany()
   const isSuperAdmin = userProfile?.role === 'super_admin'
-  const isAdmin      = userProfile?.role === 'admin'
-  const canAccess    = isSuperAdmin || isAdmin
+  // isAdmin kept for transition: old admins can still view the page / pending list
+  const isAdmin   = userProfile?.role === 'admin'
+  const canAccess = isSuperAdmin || isAdmin
 
-  const [tab, setTab]           = useState(isSuperAdmin ? 'todos' : 'pendentes')
+  const [tab, setTab]         = useState(isSuperAdmin ? 'todos' : 'pendentes')
   const [allUsers, setAllUsers] = useState([])
   const [pending, setPending]   = useState([])
+  const [cargos, setCargos]     = useState([])
+  const [tipos, setTipos]       = useState([])
   const [loading, setLoading]   = useState(true)
   const [processing, setProcessing] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Role editing (inline na tabela)
-  const [editingUser, setEditingUser] = useState(null)
-  const [newRole, setNewRole]         = useState('')
-
   // ─── Invite modal ────────────────────────────────────────────────────────────
-  const [showInvite, setShowInvite]         = useState(false)
-  const [inviteForm, setInviteForm]         = useState({ email: '', fullName: '', role: 'básico' })
-  const [inviteLoading, setInviteLoading]   = useState(false)
-  const [inviteError, setInviteError]       = useState('')
-  const [inviteSuccess, setInviteSuccess]   = useState('')
-  // Custom access no convite
-  const [inviteCustomAccess, setInviteCustomAccess]           = useState(false)
-  const [inviteSelectedCompanies, setInviteSelectedCompanies] = useState(new Set())
-  const [inviteExceptedCreds, setInviteExceptedCreds]         = useState(new Set())
-  const [inviteCredsByCompany, setInviteCredsByCompany]       = useState({})
+  const [showInvite, setShowInvite]     = useState(false)
+  const [inviteEmail, setInviteEmail]   = useState('')
+  const [inviteFullName, setInviteFullName] = useState('')
+  const [invitePerms, setInvitePerms]   = useState(defaultPerms)
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteError, setInviteError]   = useState('')
 
-  // ─── Edit access modal ───────────────────────────────────────────────────────
-  const [editAccessUser, setEditAccessUser]           = useState(null)
-  const [editCustomAccess, setEditCustomAccess]       = useState(false)
-  const [editSelectedCompanies, setEditSelectedCompanies] = useState(new Set())
-  const [editExceptedCreds, setEditExceptedCreds]     = useState(new Set())
-  const [editCredsByCompany, setEditCredsByCompany]   = useState({})
-  const [editAccessLoading, setEditAccessLoading]     = useState(false)
-  const [editAccessSaving, setEditAccessSaving]       = useState(false)
+  // ─── Edit permissions modal ──────────────────────────────────────────────────
+  const [editUser, setEditUser]     = useState(null)
+  const [editPerms, setEditPerms]   = useState(defaultPerms)
+  const [editLoading, setEditLoading] = useState(false)
+  const [editSaving, setEditSaving]   = useState(false)
 
   useEffect(() => {
     if (canAccess) fetchData()
@@ -69,52 +71,42 @@ export default function Users() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const pendingQuery = supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true })
+      const baseQueries = [
+        supabase.from('cargos').select('id, nome, cargo_tipo_credencial(tipo_credencial_id)').order('nome'),
+        supabase.from('tipos_credencial').select('id, nome, categoria').order('categoria, nome'),
+        supabase.from('user_profiles').select('*').eq('status', 'pending').order('created_at', { ascending: true }),
+      ]
 
       if (isSuperAdmin) {
-        const [pendingRes, allRes] = await Promise.all([
-          pendingQuery,
+        const [cargosRes, tiposRes, pendingRes, allRes] = await Promise.all([
+          ...baseQueries,
           supabase.from('user_profiles').select('*').order('full_name'),
         ])
+        if (cargosRes.error) throw cargosRes.error
+        if (tiposRes.error)  throw tiposRes.error
         if (pendingRes.error) throw pendingRes.error
-        if (allRes.error)     throw allRes.error
+        if (allRes.error)    throw allRes.error
+        setCargos(cargosRes.data || [])
+        setTipos(tiposRes.data || [])
         setPending(pendingRes.data || [])
-        setAllUsers(allRes.data   || [])
+        setAllUsers(allRes.data || [])
       } else {
-        const { data, error } = await pendingQuery
-        if (error) throw error
-        setPending(data || [])
+        const [cargosRes, tiposRes, pendingRes] = await Promise.all(baseQueries)
+        if (cargosRes.error)  throw cargosRes.error
+        if (tiposRes.error)   throw tiposRes.error
+        if (pendingRes.error) throw pendingRes.error
+        setCargos(cargosRes.data || [])
+        setTipos(tiposRes.data || [])
+        setPending(pendingRes.data || [])
       }
     } catch (err) {
-      console.error('Erro ao carregar usuários:', err)
+      console.error('Erro ao carregar dados:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  // ─── Helpers de credenciais on-demand ────────────────────────────────────────
-  const loadCredentialsForCompany = async (companyId, credsByCompany, setCredsByCompany) => {
-    if (credsByCompany[companyId] !== undefined) return
-    const { data } = await supabase
-      .from('credentials')
-      .select('id, name, type')
-      .eq('company_id', companyId)
-      .order('name')
-    setCredsByCompany(prev => ({ ...prev, [companyId]: data || [] }))
-  }
-
-  // ─── Regra de permissão: quem pode editar o escopo de quem ──────────────────
-  const canManageAccess = (targetUser) => {
-    if (isSuperAdmin) return true
-    if (isAdmin && targetUser.role === 'básico' && targetUser.invited_by_id === userProfile?.id) return true
-    return false
-  }
-
-  // ─── Aprovação / rejeição ────────────────────────────────────────────────────
+  // ─── Aprovação / Rejeição (exclusivo Super Admin) ────────────────────────────
   const handleApprove = async (user) => {
     setProcessing(user.id)
     try {
@@ -161,55 +153,34 @@ export default function Users() {
     }
   }
 
-  // ─── Edição de papel (inline) ────────────────────────────────────────────────
-  const handleSaveRole = async () => {
-    if (!editingUser || !newRole) return
-    try {
-      await updateUserRole(editingUser.id, newRole)
-      await fetchData()
-      setEditingUser(null)
-      setNewRole('')
-    } catch {
-      Swal.fire({ title: 'Erro', text: 'Não foi possível atualizar o perfil do usuário.', icon: 'error' })
-    }
-  }
-
-  // ─── Convite ─────────────────────────────────────────────────────────────────
-  const resetInviteState = () => {
-    setInviteForm({ email: '', fullName: '', role: 'básico' })
-    setInviteCustomAccess(false)
-    setInviteSelectedCompanies(new Set())
-    setInviteExceptedCreds(new Set())
-    setInviteCredsByCompany({})
+  // ─── Convite (exclusivo Super Admin) ─────────────────────────────────────────
+  const resetInvite = () => {
+    setInviteEmail('')
+    setInviteFullName('')
+    setInvitePerms(defaultPerms())
+    setInviteError('')
   }
 
   const handleInvite = async (e) => {
     e.preventDefault()
     setInviteError('')
-    setInviteSuccess('')
-    if (!inviteForm.fullName.trim()) {
-      setInviteError('O nome completo é obrigatório')
-      return
-    }
+    if (!inviteFullName.trim()) { setInviteError('O nome completo é obrigatório'); return }
     setInviteLoading(true)
     try {
       const { data: existing } = await supabase
         .from('user_profiles')
         .select('id')
-        .eq('email', inviteForm.email)
+        .eq('email', inviteEmail)
         .maybeSingle()
-      if (existing) {
-        setInviteError('Este e-mail já está cadastrado no sistema')
-        return
-      }
+      if (existing) { setInviteError('Este e-mail já está cadastrado no sistema'); return }
 
       const tempPassword = Math.random().toString(36).slice(-12) + 'A1!'
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: inviteForm.email,
+        email: inviteEmail,
         password: tempPassword,
         options: {
           emailRedirectTo: `${window.location.origin}/set-password`,
-          data: { full_name: inviteForm.fullName },
+          data: { full_name: inviteFullName },
         },
       })
       if (authError) {
@@ -221,44 +192,60 @@ export default function Users() {
       }
       if (!authData.user) throw new Error('Erro ao criar usuário')
 
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert([{
-          id: authData.user.id,
-          email: inviteForm.email,
-          full_name: inviteForm.fullName,
-          role: inviteForm.role,
-          status: 'pending',
-          invited_by_id: userProfile?.id || null,
-          invited_by_name: userProfile?.full_name || null,
-          custom_access_enabled: inviteCustomAccess,
-        }])
+      const isSA = invitePerms.isSuperAdmin
+      const { error: profileError } = await supabase.from('user_profiles').insert([{
+        id:             authData.user.id,
+        email:          inviteEmail,
+        full_name:      inviteFullName,
+        // Mantém role em sincronia para compatibilidade com realtime do AuthContext
+        role:                    isSA ? 'super_admin' : 'básico',
+        status:                  'pending',
+        invited_by_id:           userProfile?.id || null,
+        invited_by_name:         userProfile?.full_name || null,
+        // Modelo novo
+        is_super_admin:          isSA,
+        cargo_id:                isSA ? null : (invitePerms.cargoId || null),
+        pode_ver_todas_empresas: isSA ? true  : invitePerms.podeVerTodasEmpresas,
+        pode_criar_empresa:      isSA ? false : invitePerms.podeCriarEmpresa,
+        pode_editar_empresa:     isSA ? false : invitePerms.podeEditarEmpresa,
+        pode_excluir_empresa:    isSA ? false : invitePerms.podeExcluirEmpresa,
+        pode_criar_credencial:   isSA ? false : invitePerms.podeCriarCredencial,
+        pode_editar_credencial:  isSA ? false : invitePerms.podeEditarCredencial,
+        pode_excluir_credencial: isSA ? false : invitePerms.podeExcluirCredencial,
+        custom_access_enabled:   false,
+      }])
       if (profileError) throw profileError
 
-      // Salva acesso personalizado se habilitado
-      if (inviteCustomAccess && inviteSelectedCompanies.size > 0) {
-        const companyRows = Array.from(inviteSelectedCompanies).map(companyId => ({
-          user_id: authData.user.id,
-          company_id: companyId,
-          granted_by: userProfile?.id || null,
-        }))
-        const { error: accessErr } = await supabase.from('user_company_access').insert(companyRows)
-        if (accessErr) throw accessErr
-
-        if (inviteExceptedCreds.size > 0) {
-          const exceptRows = Array.from(inviteExceptedCreds).map(credId => ({
-            user_id: authData.user.id,
-            credential_id: credId,
-            created_by: userProfile?.id || null,
+      if (!isSA && invitePerms.tiposExtra.length > 0) {
+        const { error } = await supabase.from('usuario_tipo_credencial_extra').insert(
+          invitePerms.tiposExtra.map(tipoId => ({
+            usuario_id: authData.user.id,
+            tipo_credencial_id: tipoId,
           }))
-          const { error: exceptErr } = await supabase.from('user_credential_exceptions').insert(exceptRows)
-          if (exceptErr) throw exceptErr
-        }
+        )
+        if (error) throw error
       }
 
-      setInviteSuccess(`${inviteForm.email} convidado com sucesso! Aguardando aprovação de um Super Admin.`)
-      resetInviteState()
+      if (!isSA && !invitePerms.podeVerTodasEmpresas && invitePerms.empresas.length > 0) {
+        const { error } = await supabase.from('usuario_empresa').insert(
+          invitePerms.empresas.map(empId => ({
+            usuario_id: authData.user.id,
+            empresa_id: empId,
+          }))
+        )
+        if (error) throw error
+      }
+
+      resetInvite()
+      setShowInvite(false)
       await fetchData()
+      Swal.fire({
+        title: 'Usuário convidado!',
+        text: `${inviteEmail} convidado com sucesso. Aguardando aprovação.`,
+        icon: 'success',
+        timer: 3000,
+        showConfirmButton: false,
+      })
     } catch (err) {
       const msg = err.message || ''
       if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('email rate')) {
@@ -271,112 +258,101 @@ export default function Users() {
     }
   }
 
-  // ─── Edição de acesso personalizado ─────────────────────────────────────────
-  const openEditAccess = async (targetUser) => {
-    setEditAccessUser(targetUser)
-    setEditCustomAccess(targetUser.custom_access_enabled || false)
-    setEditSelectedCompanies(new Set())
-    setEditExceptedCreds(new Set())
-    setEditCredsByCompany({})
-    setEditAccessLoading(true)
-
+  // ─── Edição de permissões (exclusivo Super Admin) ────────────────────────────
+  const openEditPermissions = async (targetUser) => {
+    setEditUser(targetUser)
+    setEditPerms({
+      isSuperAdmin:          targetUser.is_super_admin || false,
+      cargoId:               targetUser.cargo_id || '',
+      tiposExtra:            [],
+      podeVerTodasEmpresas:  targetUser.pode_ver_todas_empresas ?? true,
+      empresas:              [],
+      podeCriarEmpresa:      targetUser.pode_criar_empresa      || false,
+      podeEditarEmpresa:     targetUser.pode_editar_empresa     || false,
+      podeExcluirEmpresa:    targetUser.pode_excluir_empresa    || false,
+      podeCriarCredencial:   targetUser.pode_criar_credencial   || false,
+      podeEditarCredencial:  targetUser.pode_editar_credencial  || false,
+      podeExcluirCredencial: targetUser.pode_excluir_credencial || false,
+    })
+    setEditLoading(true)
     try {
-      const [{ data: companyAccess, error: err1 }, { data: credExceptions, error: err2 }] =
-        await Promise.all([
-          supabase.from('user_company_access').select('company_id').eq('user_id', targetUser.id),
-          supabase.from('user_credential_exceptions').select('credential_id').eq('user_id', targetUser.id),
-        ])
-      if (err1) throw err1
-      if (err2) throw err2
-
-      const selectedIds = new Set(companyAccess?.map(r => r.company_id) || [])
-      const exceptedIds = new Set(credExceptions?.map(r => r.credential_id) || [])
-      setEditSelectedCompanies(selectedIds)
-      setEditExceptedCreds(exceptedIds)
-
-      // Pré-carrega credenciais das empresas já liberadas
-      if (selectedIds.size > 0) {
-        const results = await Promise.all(
-          Array.from(selectedIds).map(companyId =>
-            supabase
-              .from('credentials')
-              .select('id, name, type')
-              .eq('company_id', companyId)
-              .order('name')
-              .then(({ data }) => [companyId, data || []])
-          )
-        )
-        setEditCredsByCompany(Object.fromEntries(results))
-      }
+      const [{ data: tiposData, error: e1 }, { data: empData, error: e2 }] = await Promise.all([
+        supabase.from('usuario_tipo_credencial_extra').select('tipo_credencial_id').eq('usuario_id', targetUser.id),
+        supabase.from('usuario_empresa').select('empresa_id').eq('usuario_id', targetUser.id),
+      ])
+      if (e1) throw e1
+      if (e2) throw e2
+      setEditPerms(prev => ({
+        ...prev,
+        tiposExtra: tiposData?.map(r => r.tipo_credencial_id) || [],
+        empresas:   empData?.map(r => r.empresa_id)           || [],
+      }))
     } catch (err) {
-      Swal.fire({ title: 'Erro', text: 'Não foi possível carregar as configurações de acesso.', icon: 'error' })
-      setEditAccessUser(null)
+      Swal.fire({ title: 'Erro', text: 'Não foi possível carregar os dados do usuário.', icon: 'error' })
+      setEditUser(null)
     } finally {
-      setEditAccessLoading(false)
+      setEditLoading(false)
     }
   }
 
-  const saveEditAccess = async () => {
-    if (!editAccessUser) return
-    setEditAccessSaving(true)
+  const saveEditPermissions = async () => {
+    if (!editUser) return
+    setEditSaving(true)
     try {
+      const isSA = editPerms.isSuperAdmin
       const { error: profileErr } = await supabase
         .from('user_profiles')
-        .update({ custom_access_enabled: editCustomAccess })
-        .eq('id', editAccessUser.id)
+        .update({
+          role:                    isSA ? 'super_admin' : 'básico',
+          is_super_admin:          isSA,
+          cargo_id:                isSA ? null  : (editPerms.cargoId || null),
+          pode_ver_todas_empresas: isSA ? true  : editPerms.podeVerTodasEmpresas,
+          pode_criar_empresa:      isSA ? false : editPerms.podeCriarEmpresa,
+          pode_editar_empresa:     isSA ? false : editPerms.podeEditarEmpresa,
+          pode_excluir_empresa:    isSA ? false : editPerms.podeExcluirEmpresa,
+          pode_criar_credencial:   isSA ? false : editPerms.podeCriarCredencial,
+          pode_editar_credencial:  isSA ? false : editPerms.podeEditarCredencial,
+          pode_excluir_credencial: isSA ? false : editPerms.podeExcluirCredencial,
+          custom_access_enabled:   false,
+        })
+        .eq('id', editUser.id)
       if (profileErr) throw profileErr
 
-      // Substitui registros de empresa (delete-all + insert)
-      const { error: delCompErr } = await supabase
-        .from('user_company_access')
-        .delete()
-        .eq('user_id', editAccessUser.id)
-      if (delCompErr) throw delCompErr
-
-      if (editCustomAccess && editSelectedCompanies.size > 0) {
-        const rows = Array.from(editSelectedCompanies).map(companyId => ({
-          user_id: editAccessUser.id,
-          company_id: companyId,
-          granted_by: userProfile?.id || null,
-        }))
-        const { error } = await supabase.from('user_company_access').insert(rows)
+      // Sincroniza tipos extras: delete-all + insert
+      await supabase.from('usuario_tipo_credencial_extra').delete().eq('usuario_id', editUser.id)
+      if (!isSA && editPerms.tiposExtra.length > 0) {
+        const { error } = await supabase.from('usuario_tipo_credencial_extra').insert(
+          editPerms.tiposExtra.map(tipoId => ({
+            usuario_id: editUser.id,
+            tipo_credencial_id: tipoId,
+          }))
+        )
         if (error) throw error
       }
 
-      // Substitui exceções de credencial
-      const { error: delCredErr } = await supabase
-        .from('user_credential_exceptions')
-        .delete()
-        .eq('user_id', editAccessUser.id)
-      if (delCredErr) throw delCredErr
-
-      if (editCustomAccess && editExceptedCreds.size > 0) {
-        const rows = Array.from(editExceptedCreds).map(credId => ({
-          user_id: editAccessUser.id,
-          credential_id: credId,
-          created_by: userProfile?.id || null,
-        }))
-        const { error } = await supabase.from('user_credential_exceptions').insert(rows)
+      // Sincroniza empresas: delete-all + insert (só se restrito)
+      await supabase.from('usuario_empresa').delete().eq('usuario_id', editUser.id)
+      if (!isSA && !editPerms.podeVerTodasEmpresas && editPerms.empresas.length > 0) {
+        const { error } = await supabase.from('usuario_empresa').insert(
+          editPerms.empresas.map(empId => ({
+            usuario_id: editUser.id,
+            empresa_id: empId,
+          }))
+        )
         if (error) throw error
       }
 
       await fetchData()
-      setEditAccessUser(null)
-      Swal.fire({ title: 'Acessos salvos!', icon: 'success', timer: 2000, showConfirmButton: false })
+      setEditUser(null)
+      Swal.fire({ title: 'Permissões salvas!', icon: 'success', timer: 2000, showConfirmButton: false })
     } catch (err) {
-      Swal.fire({ title: 'Erro', text: err.message || 'Erro ao salvar acessos', icon: 'error' })
+      Swal.fire({ title: 'Erro', text: err.message || 'Erro ao salvar permissões', icon: 'error' })
     } finally {
-      setEditAccessSaving(false)
+      setEditSaving(false)
     }
   }
 
-  const availableRoles = isSuperAdmin
-    ? [{ value: 'básico', label: 'Básico' }, { value: 'admin', label: 'Admin' }]
-    : [{ value: 'básico', label: 'Básico' }]
-
-  // Toggle de personalização visível quando o papel convidado pode ter acesso personalizado
-  const canCustomizeInviteAccess = inviteForm.role !== 'super_admin'
-
+  // ─── Guard ────────────────────────────────────────────────────────────────────
   if (!canAccess) {
     return (
       <div className="min-h-screen bg-ea-surface">
@@ -385,7 +361,7 @@ export default function Users() {
           <div className="bg-white rounded-lg shadow p-8 text-center">
             <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Acesso Negado</h2>
-            <p className="text-gray-600">Apenas Admins e Super Admins têm acesso a esta área.</p>
+            <p className="text-gray-600">Apenas Super Admins têm acesso a esta área.</p>
           </div>
         </div>
       </div>
@@ -404,14 +380,16 @@ export default function Users() {
               <h1 className="text-3xl font-bold text-ea-dark mb-1">Usuários</h1>
               <p className="text-gray-600">Gerencie os acessos ao sistema.</p>
             </div>
-            <button
-              onClick={() => { setShowInvite(true); setInviteError(''); setInviteSuccess('') }}
-              className="flex items-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Convidar Usuário</span>
-              <span className="sm:hidden">Convidar</span>
-            </button>
+            {isSuperAdmin && (
+              <button
+                onClick={() => { resetInvite(); setShowInvite(true) }}
+                className="flex items-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span className="hidden sm:inline">Convidar Usuário</span>
+                <span className="sm:hidden">Convidar</span>
+              </button>
+            )}
           </div>
 
           {/* Abas */}
@@ -457,16 +435,10 @@ export default function Users() {
           ) : tab === 'todos' ? (
             <AllUsersTab
               users={allUsers}
+              cargos={cargos}
               currentUserId={userProfile?.id}
-              editingUser={editingUser}
-              newRole={newRole}
-              onEditRole={(u) => { setEditingUser(u); setNewRole(u.role) }}
-              onSaveRole={handleSaveRole}
-              onCancelEdit={() => { setEditingUser(null); setNewRole('') }}
-              onRoleChange={setNewRole}
-              onEditAccess={openEditAccess}
-              canManageAccess={canManageAccess}
               isSuperAdmin={isSuperAdmin}
+              onEditPermissions={openEditPermissions}
             />
           ) : (
             <PendingTab
@@ -480,23 +452,36 @@ export default function Users() {
         </div>
       </main>
 
-      {/* ─── Modal: Convidar Usuário ─────────────────────────────────────────── */}
+      {/* ─── Modal: Convidar Usuário ──────────────────────────────────────────── */}
       <Modal
         isOpen={showInvite}
-        onClose={() => { setShowInvite(false); resetInviteState(); setInviteError(''); setInviteSuccess('') }}
+        onClose={() => { setShowInvite(false); resetInvite() }}
         title="Convidar Novo Usuário"
+        footer={
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => { setShowInvite(false); resetInvite() }}
+              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form="invite-form"
+              disabled={inviteLoading}
+              className="flex items-center gap-2 bg-ea-accent text-white font-semibold px-6 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {inviteLoading ? 'Criando...' : 'Convidar'}
+            </button>
+          </div>
+        }
       >
-        <form onSubmit={handleInvite} className="space-y-4">
+        <form id="invite-form" onSubmit={handleInvite} className="space-y-5">
           {inviteError && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-red-700">{inviteError}</p>
-            </div>
-          )}
-          {inviteSuccess && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
-              <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-green-700">{inviteSuccess}</p>
             </div>
           )}
 
@@ -505,8 +490,8 @@ export default function Users() {
             <input
               type="email"
               required
-              value={inviteForm.email}
-              onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value.toLowerCase() })}
+              value={inviteEmail}
+              onChange={e => setInviteEmail(e.target.value.toLowerCase())}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
               placeholder="usuario@email.com"
             />
@@ -517,345 +502,422 @@ export default function Users() {
             <input
               type="text"
               required
-              value={inviteForm.fullName}
-              onChange={(e) => setInviteForm({ ...inviteForm, fullName: e.target.value })}
+              value={inviteFullName}
+              onChange={e => setInviteFullName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
               placeholder="Nome completo do usuário"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Perfil de Acesso *</label>
-            <select
-              value={inviteForm.role}
-              onChange={(e) => {
-                setInviteForm({ ...inviteForm, role: e.target.value })
-                if (e.target.value === 'super_admin') setInviteCustomAccess(false)
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
-            >
-              {availableRoles.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
-            {isAdmin && (
-              <p className="mt-1 text-xs text-gray-500">Admins podem convidar apenas usuários Básico.</p>
-            )}
-          </div>
-
-          {/* Toggle de personalização de acesso */}
-          {canCustomizeInviteAccess && (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setInviteCustomAccess(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <Lock className="w-4 h-4 text-ea-primary" />
-                  <span className="text-sm font-medium text-gray-700">Personalizar acessos</span>
-                  <span className="text-xs text-gray-500">— restringe o que esse usuário visualiza</span>
-                </div>
-                <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  inviteCustomAccess ? 'bg-ea-accent' : 'bg-gray-300'
-                }`}>
-                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
-                    inviteCustomAccess ? 'translate-x-5' : 'translate-x-1'
-                  }`} />
-                </div>
-              </button>
-
-              {inviteCustomAccess && (
-                <div className="p-4 space-y-2">
-                  <p className="text-xs text-gray-500 mb-3">
-                    Selecione as empresas que este usuário poderá visualizar. Dentro de cada empresa, todas as credenciais são visíveis por padrão — expanda para ocultar credenciais específicas.
-                  </p>
-                  <CustomAccessPanel
-                    companies={companies}
-                    selectedCompanyIds={inviteSelectedCompanies}
-                    exceptedCredentialIds={inviteExceptedCreds}
-                    credsByCompany={inviteCredsByCompany}
-                    onCompanyToggle={(id, checked) => {
-                      setInviteSelectedCompanies(prev => {
-                        const next = new Set(prev)
-                        if (checked) {
-                          next.add(id)
-                        } else {
-                          next.delete(id)
-                          // Remove exceções de credenciais desta empresa
-                          if (inviteCredsByCompany[id]) {
-                            const credIds = new Set(inviteCredsByCompany[id].map(c => c.id))
-                            setInviteExceptedCreds(prev2 => {
-                              const n = new Set(prev2)
-                              credIds.forEach(cid => n.delete(cid))
-                              return n
-                            })
-                          }
-                        }
-                        return next
-                      })
-                    }}
-                    onCredentialToggle={(credId, visible) => {
-                      setInviteExceptedCreds(prev => {
-                        const next = new Set(prev)
-                        if (visible) { next.delete(credId) } else { next.add(credId) }
-                        return next
-                      })
-                    }}
-                    onNeedCredentials={(companyId) =>
-                      loadCredentialsForCompany(companyId, inviteCredsByCompany, setInviteCredsByCompany)
-                    }
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => { setShowInvite(false); resetInviteState(); setInviteError(''); setInviteSuccess('') }}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={inviteLoading}
-              className="flex-1 flex items-center justify-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {inviteLoading ? 'Criando...' : 'Convidar'}
-            </button>
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-sm font-semibold text-gray-700 mb-3">Tipo de Acesso e Permissões</p>
+            <PermissionsSection
+              perms={invitePerms}
+              onChange={setInvitePerms}
+              cargos={cargos}
+              tipos={tipos}
+              companies={companies}
+            />
           </div>
         </form>
       </Modal>
 
-      {/* ─── Modal: Editar Acesso Personalizado ──────────────────────────────── */}
+      {/* ─── Modal: Editar Permissões ─────────────────────────────────────────── */}
       <Modal
-        isOpen={!!editAccessUser}
-        onClose={() => setEditAccessUser(null)}
-        title={`Acessos — ${editAccessUser?.full_name || ''}`}
-      >
-        {editAccessLoading ? (
-          <div className="flex items-center justify-center py-10">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ea-primary" />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Toggle */}
-            <button
-              type="button"
-              onClick={() => setEditCustomAccess(v => !v)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors text-left"
-            >
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-ea-primary" />
-                <span className="text-sm font-medium text-gray-700">Acesso personalizado</span>
-              </div>
-              <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                editCustomAccess ? 'bg-ea-accent' : 'bg-gray-300'
-              }`}>
-                <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
-                  editCustomAccess ? 'translate-x-5' : 'translate-x-1'
-                }`} />
-              </div>
-            </button>
-
-            {editCustomAccess ? (
-              <>
-                <p className="text-xs text-gray-500">
-                  Selecione as empresas e credenciais que este usuário poderá visualizar. Desligar o acesso personalizado libera tudo que o papel permite.
-                </p>
-                <CustomAccessPanel
-                  companies={companies}
-                  selectedCompanyIds={editSelectedCompanies}
-                  exceptedCredentialIds={editExceptedCreds}
-                  credsByCompany={editCredsByCompany}
-                  onCompanyToggle={(id, checked) => {
-                    setEditSelectedCompanies(prev => {
-                      const next = new Set(prev)
-                      if (checked) {
-                        next.add(id)
-                      } else {
-                        next.delete(id)
-                        if (editCredsByCompany[id]) {
-                          const credIds = new Set(editCredsByCompany[id].map(c => c.id))
-                          setEditExceptedCreds(prev2 => {
-                            const n = new Set(prev2)
-                            credIds.forEach(cid => n.delete(cid))
-                            return n
-                          })
-                        }
-                      }
-                      return next
-                    })
-                  }}
-                  onCredentialToggle={(credId, visible) => {
-                    setEditExceptedCreds(prev => {
-                      const next = new Set(prev)
-                      if (visible) { next.delete(credId) } else { next.add(credId) }
-                      return next
-                    })
-                  }}
-                  onNeedCredentials={(companyId) =>
-                    loadCredentialsForCompany(companyId, editCredsByCompany, setEditCredsByCompany)
-                  }
-                />
-              </>
-            ) : (
-              <p className="text-sm text-gray-500 py-2">
-                Com o acesso personalizado desligado, este usuário visualizará todas as empresas e credenciais permitidas pelo seu papel.
-              </p>
-            )}
-
-            <div className="flex gap-3 pt-2">
+        isOpen={!!editUser}
+        onClose={() => setEditUser(null)}
+        title={`Permissões — ${editUser?.full_name || ''}`}
+        footer={
+          !editLoading && (
+            <div className="flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => setEditAccessUser(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                onClick={() => setEditUser(null)}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
-                onClick={saveEditAccess}
-                disabled={editAccessSaving}
-                className="flex-1 flex items-center justify-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={saveEditPermissions}
+                disabled={editSaving}
+                className="flex items-center gap-2 bg-ea-accent text-white font-semibold px-6 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4" />
-                {editAccessSaving ? 'Salvando...' : 'Salvar'}
+                {editSaving ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
+          )
+        }
+      >
+        {editLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ea-primary" />
           </div>
+        ) : (
+          <PermissionsSection
+            perms={editPerms}
+            onChange={setEditPerms}
+            cargos={cargos}
+            tipos={tipos}
+            companies={companies}
+          />
         )}
       </Modal>
     </div>
   )
 }
 
-// ─── Panel de seleção de empresas e credenciais ────────────────────────────────
+// ─── PermissionsSection ───────────────────────────────────────────────────────
+// Painel compartilhado entre o modal de convite e o modal de edição.
 
-function CustomAccessPanel({
-  companies,
-  selectedCompanyIds,
-  exceptedCredentialIds,
-  credsByCompany,
-  onCompanyToggle,
-  onCredentialToggle,
-  onNeedCredentials,
-}) {
-  const [expanded, setExpanded] = useState(new Set())
+function PermissionsSection({ perms, onChange, cargos, tipos, companies }) {
+  const [searchTipoExtra, setSearchTipoExtra] = useState('')
+  const set = (field, value) => onChange(prev => ({ ...prev, [field]: value }))
 
-  const handleCompanyCheck = (companyId, checked) => {
-    onCompanyToggle(companyId, checked)
-    if (checked) {
-      setExpanded(prev => new Set([...prev, companyId]))
-      onNeedCredentials(companyId)
+  const toggleTipoExtra = (tipoId) =>
+    set('tiposExtra', perms.tiposExtra.includes(tipoId)
+      ? perms.tiposExtra.filter(id => id !== tipoId)
+      : [...perms.tiposExtra, tipoId]
+    )
+
+  const toggleCategoriaExtra = (tiposDaCategoria) => {
+    const ids = tiposDaCategoria.map(t => t.id)
+    const allSelected = ids.every(id => perms.tiposExtra.includes(id))
+    if (allSelected) {
+      set('tiposExtra', perms.tiposExtra.filter(id => !ids.includes(id)))
     } else {
-      setExpanded(prev => { const n = new Set(prev); n.delete(companyId); return n })
+      set('tiposExtra', [...new Set([...perms.tiposExtra, ...ids])])
     }
   }
 
-  const toggleExpand = (companyId) => {
-    if (!selectedCompanyIds.has(companyId)) return
-    setExpanded(prev => {
-      const n = new Set(prev)
-      if (n.has(companyId)) {
-        n.delete(companyId)
-      } else {
-        n.add(companyId)
-        onNeedCredentials(companyId)
-      }
-      return n
-    })
-  }
-
-  if (companies.length === 0) {
-    return (
-      <p className="text-sm text-gray-500 py-4 text-center">Nenhuma empresa cadastrada.</p>
+  const toggleEmpresa = (empId) =>
+    set('empresas', perms.empresas.includes(empId)
+      ? perms.empresas.filter(id => id !== empId)
+      : [...perms.empresas, empId]
     )
-  }
+
+  // Tipos que o cargo selecionado já cobre
+  const cargoSelecionado = cargos.find(c => c.id === perms.cargoId)
+  const tiposDoCargoIds  = new Set(cargoSelecionado?.cargo_tipo_credencial?.map(r => r.tipo_credencial_id) || [])
+  const tiposDocargo     = tipos.filter(t => tiposDoCargoIds.has(t.id))
+
+  // Tipos extras: exclui os que já vêm do cargo
+  const tiposExtras = tipos.filter(t => !tiposDoCargoIds.has(t.id))
+
+  const tiposByCategoria = tiposExtras.reduce((acc, t) => {
+    if (!acc[t.categoria]) acc[t.categoria] = []
+    acc[t.categoria].push(t)
+    return acc
+  }, {})
+
+  const filteredTiposByCategoria = searchTipoExtra.trim()
+    ? Object.entries(tiposByCategoria).reduce((acc, [cat, tiposDaCategoria]) => {
+        const q = searchTipoExtra.toLowerCase()
+        const filtered = tiposDaCategoria.filter(t => t.nome.toLowerCase().includes(q))
+        if (filtered.length > 0) acc[cat] = filtered
+        return acc
+      }, {})
+    : tiposByCategoria
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100 max-h-72 overflow-y-auto">
-      {companies.map(company => {
-        const isSelected = selectedCompanyIds.has(company.id)
-        const isExpanded = expanded.has(company.id)
-        const creds = credsByCompany[company.id]
+    <div className="space-y-4">
 
-        return (
-          <div key={company.id}>
-            <div className="flex items-center gap-3 px-3 py-2.5 bg-white hover:bg-gray-50">
-              <input
-                type="checkbox"
-                id={`ca-co-${company.id}`}
-                checked={isSelected}
-                onChange={(e) => handleCompanyCheck(company.id, e.target.checked)}
-                className="w-4 h-4 text-ea-primary rounded border-gray-300 focus:ring-ea-primary flex-shrink-0"
-              />
-              <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              <label
-                htmlFor={`ca-co-${company.id}`}
-                className="flex-1 text-sm font-medium text-gray-800 cursor-pointer"
-              >
-                {company.name}
-              </label>
-              {isSelected && (
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(company.id)}
-                  className="flex items-center gap-1 text-xs text-ea-primary hover:underline flex-shrink-0"
+      {/* 1. Tipo de acesso: Super Admin ou Usuário com Cargo */}
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tipo de Acesso</p>
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => set('isSuperAdmin', false)}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 transition-colors ${
+              !perms.isSuperAdmin
+                ? 'bg-ea-primary text-white'
+                : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            Usuário com Cargo
+          </button>
+          <button
+            type="button"
+            onClick={() => set('isSuperAdmin', true)}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 border-l border-gray-200 transition-colors ${
+              perms.isSuperAdmin
+                ? 'bg-purple-700 text-white'
+                : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            Super Admin
+          </button>
+        </div>
+        {perms.isSuperAdmin && (
+          <p className="mt-2 text-xs text-gray-500">
+            Super Admin tem acesso total ao sistema, sem restrições de cargo ou empresa.
+          </p>
+        )}
+      </div>
+
+      {!perms.isSuperAdmin && (
+        <>
+          {/* 2. Cargo */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+              Cargo
+            </label>
+            {cargos.length === 0 ? (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Nenhum cargo cadastrado.{' '}
+                <Link to="/cargos" className="text-ea-accent hover:text-ea-accent-dark underline font-semibold">
+                  Criar cargos
+                </Link>{' '}
+                antes de convidar.
+              </p>
+            ) : (
+              <>
+                <select
+                  value={perms.cargoId}
+                  onChange={e => set('cargoId', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent text-sm"
                 >
-                  {isExpanded
-                    ? <><ChevronDown className="w-3 h-3" /> Ocultar</>
-                    : <><ChevronRight className="w-3 h-3" /> Credenciais</>
-                  }
-                </button>
-              )}
-            </div>
+                  <option value="">Sem cargo atribuído</option>
+                  {cargos.map(c => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
 
-            {isSelected && isExpanded && (
-              <div className="bg-gray-50 border-t border-gray-100 px-3 py-2 pl-10 space-y-1.5">
-                {creds === undefined ? (
-                  <p className="text-xs text-gray-400 py-1">Carregando...</p>
-                ) : creds.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-1">Nenhuma credencial nesta empresa.</p>
+                {perms.cargoId && (
+                  <div className="mt-2 p-3 bg-ea-surface border border-ea-border rounded-lg">
+                    <p className="text-xs font-semibold text-gray-500 mb-2">
+                      Tipos incluídos por este cargo
+                      <span className="ml-1 font-normal text-gray-400">({tiposDocargo.length})</span>
+                    </p>
+                    {tiposDocargo.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">Nenhum tipo vinculado a este cargo.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {tiposDocargo.map(t => (
+                          <span
+                            key={t.id}
+                            className="px-2 py-0.5 text-xs bg-white text-ea-primary rounded-full border border-ea-border"
+                          >
+                            {t.nome}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            <p className="mt-1 text-xs text-gray-400">
+              Define os tipos de credencial visíveis por padrão.
+            </p>
+          </div>
+
+          {/* 3. Tipos extras de credencial */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+              Tipos Extras de Credencial
+              {perms.tiposExtra.length > 0 && (
+                <span className="ml-2 normal-case font-normal text-ea-accent">
+                  +{perms.tiposExtra.length} selecionado{perms.tiposExtra.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-gray-400 mb-2">
+              Tipos visíveis além dos definidos pelo cargo.
+            </p>
+            {tipos.length === 0 ? (
+              <p className="text-sm text-gray-500">Nenhum tipo de credencial cadastrado.</p>
+            ) : (
+              <>
+                {/* Campo de busca */}
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchTipoExtra}
+                    onChange={e => setSearchTipoExtra(e.target.value)}
+                    placeholder="Buscar tipos..."
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-ea-primary focus:border-transparent"
+                  />
+                </div>
+
+                <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
+                  {Object.entries(filteredTiposByCategoria).length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-5">Nenhum tipo encontrado.</p>
+                  ) : (
+                    Object.entries(filteredTiposByCategoria).map(([cat, tiposDaCategoria]) => {
+                      const allSelected  = tiposDaCategoria.every(t => perms.tiposExtra.includes(t.id))
+                      const someSelected = tiposDaCategoria.some(t => perms.tiposExtra.includes(t.id))
+                      return (
+                        <div key={cat}>
+                          {/* Categoria — checkbox pai */}
+                          <label className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 cursor-pointer sticky top-0 z-10">
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected }}
+                              onChange={() => toggleCategoriaExtra(tiposDaCategoria)}
+                              className="w-4 h-4 text-ea-primary rounded border-gray-300 focus:ring-ea-primary flex-shrink-0"
+                            />
+                            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">{cat}</span>
+                            <span className="ml-auto text-xs text-gray-400 font-normal normal-case">
+                              {tiposDaCategoria.filter(t => perms.tiposExtra.includes(t.id)).length}/{tiposDaCategoria.length}
+                            </span>
+                          </label>
+                          {/* Filhos */}
+                          {tiposDaCategoria.map(tipo => (
+                            <label key={tipo.id} className="flex items-center gap-3 pl-10 pr-3 py-2 hover:bg-gray-50 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={perms.tiposExtra.includes(tipo.id)}
+                                onChange={() => toggleTipoExtra(tipo.id)}
+                                className="w-4 h-4 text-ea-primary rounded border-gray-300 focus:ring-ea-primary flex-shrink-0"
+                              />
+                              <span className="text-sm text-gray-800">{tipo.nome}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* 4. Ver todas as empresas */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+              Visibilidade de Empresas
+            </p>
+            <button
+              type="button"
+              onClick={() => set('podeVerTodasEmpresas', !perms.podeVerTodasEmpresas)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-ea-primary" />
+                <span className="text-sm font-medium text-gray-700">Ver todas as empresas</span>
+              </div>
+              <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                perms.podeVerTodasEmpresas ? 'bg-ea-accent' : 'bg-gray-300'
+              }`}>
+                <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                  perms.podeVerTodasEmpresas ? 'translate-x-5' : 'translate-x-1'
+                }`} />
+              </div>
+            </button>
+
+            {!perms.podeVerTodasEmpresas && (
+              <div className="mt-2">
+                <p className="text-xs text-gray-500 mb-2">
+                  Selecione as empresas que este usuário poderá visualizar:
+                </p>
+                {companies.length === 0 ? (
+                  <p className="text-sm text-gray-500">Nenhuma empresa cadastrada.</p>
                 ) : (
-                  creds.map(cred => {
-                    const isVisible = !exceptedCredentialIds.has(cred.id)
-                    return (
-                      <div key={cred.id} className="flex items-center gap-2">
+                  <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto divide-y divide-gray-100">
+                    {companies.map(emp => (
+                      <label key={emp.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 cursor-pointer">
                         <input
                           type="checkbox"
-                          id={`ca-cr-${cred.id}`}
-                          checked={isVisible}
-                          onChange={(e) => onCredentialToggle(cred.id, e.target.checked)}
-                          className="w-3.5 h-3.5 text-ea-primary rounded border-gray-300 focus:ring-ea-primary flex-shrink-0"
+                          checked={perms.empresas.includes(emp.id)}
+                          onChange={() => toggleEmpresa(emp.id)}
+                          className="w-4 h-4 text-ea-primary rounded border-gray-300 focus:ring-ea-primary flex-shrink-0"
                         />
-                        <Key className="w-3 h-3 text-gray-300 flex-shrink-0" />
-                        <label htmlFor={`ca-cr-${cred.id}`} className="text-xs text-gray-700 cursor-pointer">
-                          <span className="font-medium">{cred.name}</span>
-                          <span className="text-gray-400 ml-1">· {cred.type}</span>
-                        </label>
-                      </div>
-                    )
-                  })
+                        <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm text-gray-800">{emp.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
           </div>
-        )
-      })}
+
+          {/* 5. Permissões de ação */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              Permissões de Ação
+            </p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-2">Empresa</p>
+                <div className="space-y-2">
+                  {[
+                    { key: 'podeCriarEmpresa',   label: 'Criar' },
+                    { key: 'podeEditarEmpresa',  label: 'Editar' },
+                    { key: 'podeExcluirEmpresa', label: 'Excluir' },
+                  ].map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={perms[key]}
+                        onChange={e => set(key, e.target.checked)}
+                        className="w-4 h-4 text-ea-primary rounded border-gray-300 focus:ring-ea-primary flex-shrink-0"
+                      />
+                      <span className="text-sm text-gray-700">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-2">Credencial</p>
+                <div className="space-y-2">
+                  {[
+                    { key: 'podeCriarCredencial',   label: 'Criar' },
+                    { key: 'podeEditarCredencial',  label: 'Editar' },
+                    { key: 'podeExcluirCredencial', label: 'Excluir' },
+                  ].map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={perms[key]}
+                        onChange={e => set(key, e.target.checked)}
+                        className="w-4 h-4 text-ea-primary rounded border-gray-300 focus:ring-ea-primary flex-shrink-0"
+                      />
+                      <span className="text-sm text-gray-700">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
+// ─── AllUsersTab ──────────────────────────────────────────────────────────────
 
-function AllUsersTab({
-  users, currentUserId, editingUser, newRole,
-  onEditRole, onSaveRole, onCancelEdit, onRoleChange,
-  onEditAccess, canManageAccess, isSuperAdmin,
-}) {
+function AllUsersTab({ users, cargos, currentUserId, isSuperAdmin, onEditPermissions }) {
+  const getCargoBadge = (u) => {
+    if (u.is_super_admin) {
+      return (
+        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+          Super Admin
+        </span>
+      )
+    }
+    if (u.cargo_id) {
+      const cargo = cargos.find(c => c.id === u.cargo_id)
+      return (
+        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+          {cargo?.nome || 'Cargo desconhecido'}
+        </span>
+      )
+    }
+    return (
+      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+        Sem cargo
+      </span>
+    )
+  }
+
   if (users.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow p-12 text-center">
@@ -874,83 +936,39 @@ function AllUsersTab({
             <tr className="border-b border-gray-200 bg-gray-50">
               <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Usuário</th>
               <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">E-mail</th>
-              <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Perfil</th>
+              <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Cargo / Acesso</th>
               <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
               <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {users.map((u) => (
+            {users.map(u => (
               <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-ea-surface flex items-center justify-center flex-shrink-0">
                       <User className="w-4 h-4 text-ea-primary" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{u.full_name}</p>
-                      {u.custom_access_enabled && (
-                        <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded mt-0.5">
-                          <Lock className="w-3 h-3" /> Acesso restrito
-                        </span>
-                      )}
-                    </div>
+                    <p className="text-sm font-medium text-gray-900">{u.full_name}</p>
                   </div>
                 </td>
                 <td className="py-3 px-4 text-sm text-gray-600">{u.email}</td>
-                <td className="py-3 px-4">
-                  {editingUser?.id === u.id ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={newRole}
-                        onChange={(e) => onRoleChange(e.target.value)}
-                        className="text-sm px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-ea-primary"
-                      >
-                        <option value="básico">Básico</option>
-                        <option value="admin">Admin</option>
-                        <option value="super_admin">Super Admin</option>
-                      </select>
-                      <button onClick={onSaveRole} className="p-1 text-green-600 hover:bg-green-50 rounded" title="Salvar">
-                        <Save className="w-4 h-4" />
-                      </button>
-                      <button onClick={onCancelEdit} className="p-1 text-gray-400 hover:bg-gray-100 rounded" title="Cancelar">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${ROLE_COLORS[u.role] || 'bg-gray-100 text-gray-700'}`}>
-                      {ROLE_LABELS[u.role] || u.role}
-                    </span>
-                  )}
-                </td>
+                <td className="py-3 px-4">{getCargoBadge(u)}</td>
                 <td className="py-3 px-4">
                   <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${STATUS_CONFIG[u.status]?.cls || 'bg-gray-100 text-gray-700'}`}>
                     {STATUS_CONFIG[u.status]?.label || u.status}
                   </span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    {/* Editar papel (apenas super_admin e para outros usuários) */}
-                    {isSuperAdmin && u.id !== currentUserId && editingUser?.id !== u.id && (
-                      <button
-                        onClick={() => onEditRole(u)}
-                        className="p-1.5 text-ea-primary hover:bg-ea-surface rounded transition-colors"
-                        title="Editar papel"
-                      >
-                        <Shield className="w-4 h-4" />
-                      </button>
-                    )}
-                    {/* Personalizar acessos */}
-                    {canManageAccess(u) && u.id !== currentUserId && editingUser?.id !== u.id && (
-                      <button
-                        onClick={() => onEditAccess(u)}
-                        className="p-1.5 text-ea-primary hover:bg-ea-surface rounded transition-colors"
-                        title="Personalizar acessos"
-                      >
-                        <Settings2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+                  {isSuperAdmin && u.id !== currentUserId && (
+                    <button
+                      onClick={() => onEditPermissions(u)}
+                      className="p-1.5 text-ea-primary hover:bg-ea-surface rounded transition-colors"
+                      title="Editar permissões"
+                    >
+                      <Settings2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -960,7 +978,7 @@ function AllUsersTab({
 
       {/* Mobile */}
       <div className="md:hidden divide-y divide-gray-100">
-        {users.map((u) => (
+        {users.map(u => (
           <div key={u.id} className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -971,64 +989,31 @@ function AllUsersTab({
                   <p className="font-medium text-gray-900 truncate">{u.full_name}</p>
                   <p className="text-sm text-gray-500 truncate">{u.email}</p>
                   <div className="flex gap-2 mt-1 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_COLORS[u.role] || 'bg-gray-100'}`}>
-                      {ROLE_LABELS[u.role] || u.role}
-                    </span>
+                    {getCargoBadge(u)}
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CONFIG[u.status]?.cls || 'bg-gray-100'}`}>
                       {STATUS_CONFIG[u.status]?.label || u.status}
                     </span>
-                    {u.custom_access_enabled && (
-                      <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
-                        <Lock className="w-3 h-3" /> Restrito
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                {isSuperAdmin && u.id !== currentUserId && editingUser?.id !== u.id && (
-                  <button onClick={() => onEditRole(u)} className="p-1.5 text-ea-primary hover:bg-ea-surface rounded">
-                    <Shield className="w-4 h-4" />
-                  </button>
-                )}
-                {canManageAccess(u) && u.id !== currentUserId && editingUser?.id !== u.id && (
-                  <button onClick={() => onEditAccess(u)} className="p-1.5 text-ea-primary hover:bg-ea-surface rounded">
-                    <Settings2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+              {isSuperAdmin && u.id !== currentUserId && (
+                <button
+                  onClick={() => onEditPermissions(u)}
+                  className="p-1.5 text-ea-primary hover:bg-ea-surface rounded flex-shrink-0"
+                  title="Editar permissões"
+                >
+                  <Settings2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
-            {editingUser?.id === u.id && (
-              <div className="mt-3 flex items-center gap-2">
-                <select
-                  value={newRole}
-                  onChange={(e) => onRoleChange(e.target.value)}
-                  className="flex-1 text-sm px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-ea-primary"
-                >
-                  <option value="básico">Básico</option>
-                  <option value="admin">Admin</option>
-                  <option value="super_admin">Super Admin</option>
-                </select>
-                <button
-                  onClick={onSaveRole}
-                  className="px-3 py-1.5 bg-ea-accent text-white text-sm rounded hover:bg-ea-accent-dark"
-                >
-                  Salvar
-                </button>
-                <button
-                  onClick={onCancelEdit}
-                  className="px-3 py-1.5 border border-gray-300 text-gray-600 text-sm rounded hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-              </div>
-            )}
           </div>
         ))}
       </div>
     </div>
   )
 }
+
+// ─── PendingTab ───────────────────────────────────────────────────────────────
 
 function PendingTab({ pending, processing, isSuperAdmin, onApprove, onReject }) {
   if (pending.length === 0) {
@@ -1050,7 +1035,7 @@ function PendingTab({ pending, processing, isSuperAdmin, onApprove, onReject }) 
         </span>
       </div>
       <ul className="divide-y divide-gray-100">
-        {pending.map((u) => (
+        {pending.map(u => (
           <li key={u.id} className="px-4 py-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -1060,10 +1045,7 @@ function PendingTab({ pending, processing, isSuperAdmin, onApprove, onReject }) 
                 <div className="min-w-0">
                   <p className="font-medium text-gray-900">{u.full_name}</p>
                   <p className="text-sm text-gray-500 truncate">{u.email}</p>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_COLORS[u.role] || 'bg-gray-100'}`}>
-                      {ROLE_LABELS[u.role] || u.role}
-                    </span>
+                  <div className="mt-1">
                     {u.invited_by_name ? (
                       <span className="text-xs text-gray-500">
                         Convidado por <span className="font-medium text-gray-700">{u.invited_by_name}</span>

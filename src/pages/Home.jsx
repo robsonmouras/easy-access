@@ -20,8 +20,11 @@ const Home = () => {
   const [openMenuId, setOpenMenuId] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const canManageCompanies = userProfile?.role === 'super_admin' || userProfile?.role === 'admin'
-  const canDelete = userProfile?.role === 'super_admin'
+  const isSuperAdmin      = userProfile?.is_super_admin === true || userProfile?.role === 'super_admin'
+  const canCreateCompany  = isSuperAdmin || !!userProfile?.pode_criar_empresa
+  const canEditCompany    = isSuperAdmin || !!userProfile?.pode_editar_empresa
+  const canDeleteCompany  = isSuperAdmin || !!userProfile?.pode_excluir_empresa
+  const canManageMenu     = canEditCompany || canDeleteCompany
 
   useEffect(() => {
     fetchCompaniesWithCredentials()
@@ -47,8 +50,13 @@ const Home = () => {
         })
       )
 
+      // Usuários sem super admin não veem empresas sem credenciais visíveis para eles
+      const withVisibility = isSuperAdmin
+        ? companiesData
+        : companiesData.filter((c) => c.credentialsCount > 0)
+
       // Filtrar por busca
-      const filtered = companiesData.filter((company) =>
+      const filtered = withVisibility.filter((company) =>
         company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (company.description && company.description.toLowerCase().includes(searchTerm.toLowerCase()))
       )
@@ -115,7 +123,7 @@ const Home = () => {
                 </p>
               </div>
 
-              {canManageCompanies && (
+              {canCreateCompany && (
                 <button
                   onClick={() => setShowCompanyForm(true)}
                   className="flex items-center gap-2 bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
@@ -152,7 +160,7 @@ const Home = () => {
               <p className="text-gray-600 mb-4">
                 {searchTerm ? 'Nenhuma empresa encontrada' : 'Nenhuma empresa cadastrada'}
               </p>
-              {canManageCompanies && !searchTerm && (
+              {canCreateCompany && !searchTerm && (
                 <button
                   onClick={() => setShowCompanyForm(true)}
                   className="bg-ea-accent text-white font-semibold px-4 py-2 rounded-lg hover:bg-ea-accent-dark transition-colors"
@@ -186,7 +194,7 @@ const Home = () => {
                       </div>
                     </div>
 
-                    {canManageCompanies && (
+                    {canManageMenu && (
                       <div className="relative z-50" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => setOpenMenuId(openMenuId === company.id ? null : company.id)}
@@ -197,14 +205,16 @@ const Home = () => {
                         </button>
                         {openMenuId === company.id && (
                           <div className="absolute right-0 top-9 bg-white border border-gray-200 shadow-lg rounded-lg z-50 py-1 min-w-[130px]">
-                            <button
-                              onClick={() => { setEditingCompany(company); setOpenMenuId(null) }}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <Pencil className="w-4 h-4" />
-                              Editar
-                            </button>
-                            {canDelete && (
+                            {canEditCompany && (
+                              <button
+                                onClick={() => { setEditingCompany(company); setOpenMenuId(null) }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <Pencil className="w-4 h-4" />
+                                Editar
+                              </button>
+                            )}
+                            {canDeleteCompany && (
                               <button
                                 onClick={() => { handleDeleteClick(company); setOpenMenuId(null) }}
                                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"

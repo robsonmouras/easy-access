@@ -1,6 +1,6 @@
 ﻿import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { LogOut, Menu, User, Users, Home as HomeIcon } from 'lucide-react'
+import { LogOut, Menu, User, Users, Home as HomeIcon, Briefcase, Tag } from 'lucide-react'
 import V4Logo from './V4Logo'
 
 const Header = ({ sidebarOpen, setSidebarOpen }) => {
@@ -14,14 +14,12 @@ const Header = ({ sidebarOpen, setSidebarOpen }) => {
     navigate('/login')
   }
 
-  const getRoleLabel = (role) => {
-    const roles = {
-      super_admin: 'Super Admin',
-      admin: 'Admin',
-      básico: 'Básico',
-    }
-    return roles[role] || role
+  const getRoleLabel = (role, isSuperAdmin) => {
+    if (isSuperAdmin) return 'Super Admin'
+    return role === 'super_admin' ? 'Super Admin' : 'Usuário'
   }
+
+  const isSuperAdmin = userProfile?.is_super_admin === true || userProfile?.role === 'super_admin'
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -54,11 +52,11 @@ const Header = ({ sidebarOpen, setSidebarOpen }) => {
             <User className="w-4 h-4" />
             <span>{userProfile?.full_name || 'Usuário'}</span>
             <span className="px-2 py-1 bg-ea-surface rounded text-xs">
-              {getRoleLabel(userProfile?.role)}
+              {getRoleLabel(userProfile?.role, isSuperAdmin)}
             </span>
           </div>
 
-          {(userProfile?.role === 'super_admin' || userProfile?.role === 'admin') && (
+          {isSuperAdmin && (
             <button
               onClick={() => navigate('/users')}
               className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -67,6 +65,27 @@ const Header = ({ sidebarOpen, setSidebarOpen }) => {
               <Users className="w-4 h-4" />
               <span className="hidden md:inline">Usuários</span>
             </button>
+          )}
+
+          {isSuperAdmin && (
+            <>
+              <button
+                onClick={() => navigate('/cargos')}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Gerenciar cargos"
+              >
+                <Briefcase className="w-4 h-4" />
+                <span className="hidden md:inline">Cargos</span>
+              </button>
+              <button
+                onClick={() => navigate('/tipos-credencial')}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Tipos de credencial"
+              >
+                <Tag className="w-4 h-4" />
+                <span className="hidden md:inline">Tipos</span>
+              </button>
+            </>
           )}
 
           <button
